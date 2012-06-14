@@ -1,0 +1,15 @@
+{% extends 'studies/base.html' %}
+{% load staticfiles %}
+{% block content %}
+<ul id="studies" class="unstyled">
+  {% for study in processedlist %}
+  <li class="processed icon">
+    <span>Study ID {{study}}</span>
+    <a class="download icon" href='/studies/download/{{study}}'>Study Data</a>
+    <a class="log icon" href='/studies/downloadLog/{{study}}'>Log</a>
+    <a class="visual icon" href='/studies/{{study}}'>Visualization</a>
+    <a class="allpairs icon" href='/studies/downloadAllPairs/{{study}}'>All Pairs Data</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+{{notice}}
+<form id="studyinput" action="." method="post">
+	{% csrf_token %}
+	{{ form.as_p }}
+	<input type="submit" value="Submit" class="btn btn-success" />
+</form>
+{% endblock %}

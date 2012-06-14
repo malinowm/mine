@@ -1,0 +1,55 @@
+{% load staticfiles %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>MINE</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="//bootswatch.com/readable/bootstrap.css" rel="stylesheet">
+    <link href="{{ STATIC_URL }}visualization/svg.css" rel="stylesheet">
+    <link href="{{ STATIC_URL }}template.css" type="text/css" rel="stylesheet">
+    <style type="text/css">
+      body {
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div class="span3">
+          <div class="thumbnail">
+            <img src="{{ STATIC_URL }}images/mine-truck.png" />
+          </div>
+          <div class="well sidebar-nav">
+            <ul class="nav nav-list">
+	      <li><a href='/studies'>Home</a></li>
+	      <li><a href='/studies/about'>About Us</a></li>
+	      <li><a href='/studies/list'>Requested Studies</a></li>
+	      <li><a href='/studies/plist'>Processed Studies</a></li>
+	      <li><a href='/studies/qlist'>Queued Studies</a></li>
+            </ul>
+          </div>
+	 <form id="search">
+	   <input type="text" placeholder="Search MINE" />
+	 </form>
+        </div>
+        <div class="span9">
+	<div style="height: 128px; background: url({{STATIC_URL}}images/head-bg.png);">
+		<div style="height: 128px; background: url({{STATIC_URL}}images/head-decoration.png) no-repeat;"></div>
+		<div style="height: 96px; background: url({{STATIC_URL}}images/mine-head-logo.png) no-repeat; margin-top: -109px;"/></div>
+	</div>
+	{% block content %}{% endblock %}
+        </div>
+      </div>
+      <hr>
+      <footer>
+        <p>&copy; 2012. MINE: Medical Informatics Network Excavator. Ohio State University.  </p>
+      </footer>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}visualization/d3.v2.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}visualization/vis.js"></script>
+  </body>
+</html>

@@ -1,0 +1,3 @@
+[submodule "application/geo_api"]
+	path = application/geo_api
+	url = git://github.com/andrewdyates/geo_api.git

@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<h2 align="center">Study GSE{{studyid}}: MIC vs. PCC</h2>
+<div id="chart"></div>
+<div class="alert alert-info">
+  <ul>
+    <li>To view pairwise scatter plot for a pairwise point, please click on any of the points above.
+    <li>You can then hover over any points in the pairwise scatter plot to view their values.
+</div>
+{% endblock %}

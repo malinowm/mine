@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<ul id="studies" class="unstyled">
+  {% for study in queuedlist %}
+  <li class="processing icon">
+    <span>Study ID {{study}}</span>
+    <a class="download icon" href='/studies/download/{{study}}'>Study Data</a>
+    <a class="log icon" href='/studies/downloadLog/{{study}}'>Log</a>
+    <a class="visualno icon">Visualization</a>
+    <a class="allpairsno icon">All Pairs Data</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

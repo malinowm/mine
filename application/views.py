@@ -13,6 +13,7 @@ from django.core.servers.basehttp import FileWrapper
 from django.utils import simplejson
 from pymongo import Connection
 import re
+from django.contrib.auth import authenticate, login
 
 HOST = '127.0.0.1'
 PORT = 27017
@@ -23,85 +24,140 @@ class ContactForm(forms.Form):
     Email = forms.EmailField(max_length=256)
     Study = forms.CharField(max_length=16)
 
+class LoginForm(forms.Form):
+    Username = forms.CharField(max_length=16)
+    Password = forms.CharField(max_length=16)
+
+# login handles user requests to log in to the website
+@csrf_protect
+def login_auth(request):
+    c = {}
+    c.update(csrf(request))
+    username = password = ''
+    if request.method == 'POST':
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data['Username']
+            password = form.cleaned_data['Password']
+
+            user = authenticate(username=username, password=password)
+            if user.is_active:
+                login(request, user)
+                return HttpResponseRedirect('/studies')
+            else:
+                return HttpResponse("wrong")
+    form = LoginForm()
+
+    t = loader.get_template('login.html')
+    c = RequestContext(request, {'form':form, 'username':username})
+    return HttpResponse(t.render(c))
+
+
+
+    
+
 # home handles requests for the home page
 @csrf_protect
 def home(request):
-    c = {}
-    c.update(csrf(request))
-    notice = ""
+    if request.user.is_authenticated():
+        c = {}
+        c.update(csrf(request))
+        notice = ""
     
-    if request.method == 'POST': # If the form has been submitted...
-        form = ContactForm(request.POST) # A form bound to the POST data
-        if form.is_valid(): # All validation rules pass
+        if request.method == 'POST': # If the form has been submitted...
+            form = ContactForm(request.POST) # A form bound to the POST data
+            if form.is_valid(): # All validation rules pass
             
-            # Check for study existance, download files, upload files and notify user of progress via email
-            try:
-                thread.start_new_thread(downloadAndUpload, (form.cleaned_data['Study'].upper(), form.cleaned_data['Email']))
-                dt = str(datetime.now())
-                notice = dt[:len(dt)-7] + ": Thanks for using M.I.N.E. We will notify you via email at " + form.cleaned_data['Email'] + " as updates occur on study " + form.cleaned_data['Study'] + "."
-            except:
-                notice = "an error has occur"
-    #make form to store input
-    form = ContactForm()
+                # Check for study existance, download files, upload files and notify user of progress via email
+                try:
+                    thread.start_new_thread(downloadAndUpload, (form.cleaned_data['Study'].upper(), form.cleaned_data['Email']))
+                    dt = str(datetime.now())
+                    notice = dt[:len(dt)-7] + ": Thanks for using M.I.N.E. We will notify you via email at " + form.cleaned_data['Email'] + " as updates occur on study " + form.cleaned_data['Study'] + "."
+                except:
+                    notice = "an error has occur"
+        #make form to store input
+        form = ContactForm()
 
-    #send http response back to user
-    t = loader.get_template('home.html')
-    c = RequestContext(request, {'form':form,'notice': notice})
-    return HttpResponse(t.render(c))
+        #send http response back to user
+        t = loader.get_template('home.html')
+        c = RequestContext(request, {'form':form,'notice': notice})
+        return HttpResponse(t.render(c))
+    else:
+        return HttpResponseRedirect('login')
+
 
 #data handles requests for the visualization page
 #studynumber is required to be a valid GSE id of hte form GSE##### where # is a decimal digit
 def data(request, studynumber):
-    
-    #send http response back to user
-    t = loader.get_template('index.html')
-    c = RequestContext(request, {'studyid':studynumber})
-    return HttpResponse(t.render(c))
+    if request.user.is_authenticated():
+        #send http response back to user
+        t = loader.get_template('index.html')
+        c = RequestContext(request, {'studyid':studynumber})
+        return HttpResponse(t.render(c))
+
+    else:
+        return HttpResponseRedirect('login')
 
 #list handles requests for the requested studies page
 def list(request):
 
-    # get list of not queued not processed studies
-    waitlist = getWaitingStudyList()
-    # get list of queued studies
-    queuedlist = getQueuedStudyList()
-    # get list of processed studies
-    processedlist = getProcessedStudyList()
+    if request.user.is_authenticated():
+        # get list of not queued not processed studies
+        waitlist = getWaitingStudyList()
+        # get list of queued studies
+        queuedlist = getQueuedStudyList()
+        # get list of processed studies
+        processedlist = getProcessedStudyList()
 
-    #send http response back to user
-    t = loader.get_template('list.html')
-    c = RequestContext(request, {'queuedlist':queuedlist,'processedlist':processedlist,'waitlist':waitlist,})
-    return HttpResponse(t.render(c))
+        #send http response back to user
+        t = loader.get_template('list.html')
+        c = RequestContext(request, {'queuedlist':queuedlist,'processedlist':processedlist,'waitlist':waitlist,})
+        return HttpResponse(t.render(c))
+
+    else:
+        return HttpResponseRedirect('../login')
 
 #plist handles requests for the processed studies page
 def plist(request):
+    
+    if request.user.is_authenticated():
+        # get list of processed studies
+        processedlist = getProcessedStudyList()
 
-    # get list of processed studies
-    processedlist = getProcessedStudyList()
+        # return http response back to user
+        t = loader.get_template('plist.html')
+        c = RequestContext(request, {'processedlist':processedlist,})
+        return HttpResponse(t.render(c))
 
-    # return http response back to user
-    t = loader.get_template('plist.html')
-    c = RequestContext(request, {'processedlist':processedlist,})
-    return HttpResponse(t.render(c))
+    else:
+        return HttpResponseRedirect('../login')
 
 #qlist handles requests for the queued studies page
 def qlist(request):
 
-    #get list of queued studies
-    queuedlist = getQueuedStudyList()
+    if request.user.is_authenticated():
+        #get list of queued studies
+        queuedlist = getQueuedStudyList()
 
-    # return http response back to user
-    t = loader.get_template('qlist.html')
-    c = RequestContext(request, {'queuedlist':queuedlist,})
-    return HttpResponse(t.render(c))
+        # return http response back to user
+        t = loader.get_template('qlist.html')
+        c = RequestContext(request, {'queuedlist':queuedlist,})
+        return HttpResponse(t.render(c))
+
+    else:
+        return HttpResponseRedirect('../login')
 
 #about handles requests for the about page
 def about(request):
 
-    # return htp response back to user
-    t = loader.get_template('about.html')
-    c = RequestContext(request, {})
-    return HttpResponse(t.render(c))
+    if request.user.is_authenticated():
+        # return htp response back to user
+        t = loader.get_template('about.html')
+        c = RequestContext(request, {})
+        return HttpResponse(t.render(c))
+
+    else:
+        return HttpResponseRedirect('../login')
 
 #send_zipfile handles requests to download Study Data
 #studynumber is required to be a string containing a valid GSE id of the form GSE##### where # is a decimal digit

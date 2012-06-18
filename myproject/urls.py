@@ -24,5 +24,5 @@ urlpatterns = patterns('',
     url(r'^studies/getData/$', 'application.views.formatData'),
     url(r'^studies/downloadAllPairs/GSE(?P<studynumber>\d+)/$', 'application.views.sendAllPairs'),
     url(r'^studies/downloadLog/GSE(?P<studynumber>\d+)/$', 'application.views.sendLog'),
-
+    url(r'^studies/login/$', 'application.views.login_auth'),
 )

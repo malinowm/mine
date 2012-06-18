@@ -8,7 +8,7 @@ from datetime import datetime
 import smtplib
 import string
 from ftplib import FTP
-#from geo_api.script import *
+from geo_api.script import *
 
 
 #connection info

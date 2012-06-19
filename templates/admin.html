@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+<h1>Send Studies for Processing </h1>
+
+<ul id="studies" class="unstyled">
+  {% for study, date in data %}
+  <li><table>
+      <tr><td width=45%>
+	  <a href=""> Study ID {{study}}</a>
+      </td><td width=55%>
+	  Requested {{date}}
+      </td></tr>
+      </table>
+  </li>
+  {% endfor %}
+</ul>
+<h2> Remove Studies </h2>
+
+<form id="studyinput" action="." method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="submit" value="Delete" class="btn btn-success" />
+</form>
+
+
+{% endblock %}

@@ -5,7 +5,7 @@ from django.core.context_processors import csrf
 from django.views.decorators.csrf import csrf_protect
 from django import forms
 #from geo_api.script import *
-from mineWebservice import postRequest, alreadyRequested, getQueuedStudyList, getProcessedStudyList, RetrieveData, isValidNumber, downloadAndUpload, getWaitingStudyList
+from mineWebservice import postRequest, alreadyRequested, getQueuedStudyList, getProcessedStudyList, RetrieveData, isValidNumber, downloadAndUpload, getWaitingStudyList, getDateRequested, removeByNumber, dropStudyData
 from datetime import datetime
 import thread
 import os, tempfile, zipfile
@@ -28,6 +28,9 @@ class LoginForm(forms.Form):
     Username = forms.CharField(max_length=16)
     Password = forms.CharField(max_length=16)
 
+class RemovalForm(forms.Form):
+    Studyno = forms.CharField(max_length=16)
+
 # login handles user requests to log in to the website
 @csrf_protect
 def login_auth(request):
@@ -41,10 +44,11 @@ def login_auth(request):
             password = form.cleaned_data['Password']
 
             user = authenticate(username=username, password=password)
-            if user.is_active:
-                login(request, user)
-                return HttpResponseRedirect('/studies')
-            else:
+            try:
+                if user.is_active:
+                    login(request, user)
+                    return HttpResponseRedirect('/studies')
+            except:
                 return HttpResponse("wrong")
     form = LoginForm()
 
@@ -52,7 +56,38 @@ def login_auth(request):
     c = RequestContext(request, {'form':form, 'username':username})
     return HttpResponse(t.render(c))
 
+@csrf_protect
+def admin(request):
 
+    if request.user.is_authenticated():
+        if request.method == 'POST':
+            form = RemovalForm(request.POST)
+            if form.is_valid():
+            #remove study for database here
+                removeByNumber(form.cleaned_data['Studyno'])
+                dropStudyData(form.cleaned_data['Studyno'])
+
+                
+
+    
+        #get list of queued studies
+        queuedlist = getQueuedStudyList()
+        datelist = []
+
+        #get list of dates studies requested
+        for study in queuedlist:
+            datelist.append(getDateRequested(study))
+
+        # return http response back to user
+
+        form = RemovalForm()
+
+        data = zip(queuedlist, datelist)
+        t = loader.get_template('admin.html')
+        c = RequestContext(request, {'form':form,'data':data,'queuedlist':queuedlist, 'datelist':datelist,})
+        return HttpResponse(t.render(c))
+    else:
+        return HttpResponseRedirect('../login')
 
     
 

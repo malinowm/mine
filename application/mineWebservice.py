@@ -9,7 +9,7 @@ import smtplib
 import string
 from ftplib import FTP
 from geo_api.script import *
-
+import time
 
 #connection info
 HOST = '127.0.0.1'
@@ -121,6 +121,13 @@ def getQueuedStudyList():
 	#disconnect
         Connection.disconnect(connection)
         return x
+
+def getDateRequested(gse):
+	#connect
+	connection = Connection(HOST, PORT)
+	db = connection.MINE
+	return db.request.find({"gse":gse}).distinct("datetime")[0]
+	
 
 # returns a list of distinct studyid's that have been processed as a list
 def getProcessedStudyList():
@@ -235,6 +242,15 @@ def removeByNumber(studyid):
 	#disconnect
         Connection.disconnect(connection)
 
+def dropStudyData(studyid):
+	#connect
+        connection = Connection(HOST, PORT)
+        db = connection.MINE
+        #remove study data
+	db[studyid].drop()
+        #disconnect
+        Connection.disconnect(connection)
+
 # uploads a pair of variable name and a list of data into database (A single line read for a study file) for studyid
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
 # varname is required to be a string
@@ -271,6 +287,9 @@ def uploadStudy(studyid):
         path = 'Studies/' + studyid +'/'
         listing = os.listdir(path)
 
+	connection = Connection(HOST, PORT)
+	db = connection.MINE
+
 	logfile = path +'log.txt'
 	#logging setup
         logging.basicConfig(filename=logfile,level=logging.INFO)
@@ -289,14 +308,22 @@ def uploadStudy(studyid):
                                 for line in f:
                                         count = count + 1
                                         if count > 3:
+						logging.info("reading line " + str(count))
                                                 try:
                                                         #insert lines
+							logging.info("splitting line")
                                                         cells = line.split("\t")
+							logging.info("stripping newline char")
                                                         cells[-1] = cells[-1].rstrip()
-                                                        uploadLine(studyid, cells[0], cells[1:])
-                                                        
+							logging.info("uploading line")
+                                                        #uploadLine(studyid, cells[0], cells[1:])
+                                                        line = {"id": cells[0], "data": cells[1:]}
+							db[studyid].insert(line)
+
                                                 except:
                                                         logging.error("line " + count + " could not be read")
+					else:
+						logging.info("header line read")
 
                                 #close file
 				logging.info("lines successfully read")
@@ -307,6 +334,9 @@ def uploadStudy(studyid):
 				markRequestQueued(studyid)
                         except:
                                 logging.error("Could not open " + file)
+				Connection.disconnect(connection)
+
+	Connection.disconnect(connection)
 
                                 
 # uploads pairwise data for a studyid into the database 
@@ -463,7 +493,6 @@ def downloadAndUpload(studyid, email):
 		    #logfile = path +'Upload.log'
                     #logging setup
 		    #logging.basicConfig(filename=logfile,level=logging.INFO)
-
 
                     postRequest(studyid, email)
 		    sendEmail([email], studyid, 1)

@@ -4,7 +4,7 @@ from pymongo import Connection
 import os
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, date
 import smtplib
 import string
 from ftplib import FTP
@@ -14,6 +14,72 @@ import time
 #connection info
 HOST = '127.0.0.1'
 PORT = 27017
+
+def uploadAttrFile(studyid):
+
+    #connection to the database
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+    filepath = 'Studies/' + studyid +'/' + studyid + '.tab'
+    f = open(filepath)
+    logging.info(studyid + ".tab has been successfully open")
+    attrlist = []
+    ready = 0
+    for line in f:
+        #remove trailing newline character
+        line = line.rstrip()
+        if line[0] == '#':
+            #line is header line
+            gsm_ids = line.split("\t")
+            gsm_ids = gsm_ids[1:]
+            n = 1
+            for id in gsm_ids:
+                #check ids for semicolon separators
+                more_ids = id.split(";")
+                for x in more_ids:
+                    #insert ids into database with no to keep order
+                    db[studyid+"order"].insert({"no":n,"GSM":x})
+                    n+=1
+        else:
+            #check for attribute line
+
+            data = line.split("\t")
+
+            result = re.match("attribute_", data[0])
+
+            if result:
+                #line is attribute line
+                    no = 0
+                    for cell in data[1:]:
+                        #make list out of attributes separated by ,'s
+                        if cell.find(',') > 0:
+                            cell = cell.split(',')
+                        #ready denotes weather or not all dicts have been initialized or not
+                        if ready == 0:
+                            attrlist.append({})
+                            attrlist[no][(data[0][10:])] = cell
+                        else:
+                            attrlist[no][(data[0][10:])] = cell
+                        no+=1
+                    ready = 1
+            else:
+                #line is id/float data line
+                db[studyid].insert({"id":data[0], "canonical_id":data[0].upper(), "data":data[1:]})
+
+    no = 1
+    #for each dict add id-GSM entry and insert
+    logging.info("all lines successfully read")
+    for entry in attrlist:
+        gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
+        entry['GSM'] = gsm_id
+        db[studyid+'GSM'].insert(entry)
+
+    logging.info("data has been uploaded to database")
+    markRequestQueued(studyid)
+    Connection.disconnect(connection)
+    #close and delete the file
+    f.close()
 
 
 # inserts a request document into the database if studyid has not yet been requested
@@ -99,6 +165,7 @@ def markRequestQueued(studyid):
         db.request.update({"gse":studyid,}, {"$set": {"queued":True}})
         #disconnect
 	Connection.disconnect(connection)
+	logging.info("study " + studyid + "has been successfully queued")
 
 # returns a list of distinct studyid's that have been requested as a list
 def getStudyList():
@@ -122,11 +189,14 @@ def getQueuedStudyList():
         Connection.disconnect(connection)
         return x
 
-def getDateRequested(gse):
+def getDateRequested(studyid):
 	#connect
 	connection = Connection(HOST, PORT)
 	db = connection.MINE
-	return db.request.find({"gse":gse}).distinct("datetime")[0]
+	ret = db.request.find({"gse":studyid}).distinct("datetime")[0]
+     	ret = ret.strftime("%B %d, %Y")
+	Connection.disconnect(connection)
+	return ret
 	
 
 # returns a list of distinct studyid's that have been processed as a list
@@ -241,6 +311,7 @@ def removeByNumber(studyid):
         db.request.remove({"gse":studyid})
 	#disconnect
         Connection.disconnect(connection)
+	
 
 def dropStudyData(studyid):
 	#connect
@@ -248,6 +319,10 @@ def dropStudyData(studyid):
         db = connection.MINE
         #remove study data
 	db[studyid].drop()
+	order = studyid+'order'
+	db[order].drop()
+	gsm = studyid+'GSM'
+	db[gsm].drop()
         #disconnect
         Connection.disconnect(connection)
 
@@ -260,7 +335,7 @@ def uploadLine(studyid, varname, floats):
         connection = Connection(HOST, PORT)
         db = connection.MINE
 	#create and upload line
-        line = {"id": varname, "data": floats}
+        line = {"id": varname,"canonical_id":varname.upper(), "data": floats}
         db[studyid].insert(line)
 	#disconnect
         Connection.disconnect(connection)
@@ -273,11 +348,52 @@ def RetrieveData(studyid, id):
         connection = Connection(HOST, PORT)
         db = connection.MINE
 	# get list of data
-        x = list( db[studyid].find({"id":id}) )
+	x = list( db[studyid].find({"canonical_id":id.upper()}) )
 	#disconnect
         Connection.disconnect(connection)
 	#return list of floats
-        return map(float, x[0]['data'])
+	try:
+		ret = map(float, x[0]['data'])
+	except:
+		ret = []
+		for item in x[0]['data']:
+			try:
+				f = float(item)
+			except:
+				f = item = 0.00
+			ret.append(f)
+	return ret
+def retrieveChartData(studyid, gene_x, gene_y):
+	#connect                                                                                                                         
+        connection = Connection(HOST, PORT)
+        db = connection.MINE
+        # get list of data                                                                                                               
+	x = list( db[studyid].find({"canonical_id":gene_x.upper()}) )[0]['data']
+	y = list( db[studyid].find({"canonical_id":gene_y.upper()}) )[0]['data']
+
+        n = 1
+	ret = []
+	for t in x:
+		entry = {}
+		next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
+		data = db[studyid +"GSM"].find({"geo_accession":next}).distinct("characteristics_ch1")
+		
+		#change list of characteristics to dict
+		sample = {}
+		for item in data:
+			pair = item.split(": ")
+			sample[pair[0]] = getCorrectType(pair[1])
+		sample['id'] = next
+		entry["y"] = getCorrectType(y[n-1])
+		entry["x"] = getCorrectType(x[n-1])
+		entry["sample"] = sample
+		ret.append(entry)
+		n+=1
+
+        #disconnect                                                                                                                      
+        Connection.disconnect(connection)
+                                                                                    
+        return ret
 
 # uploads all the files for a studyid into database line by line.
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
@@ -289,10 +405,6 @@ def uploadStudy(studyid):
 
 	connection = Connection(HOST, PORT)
 	db = connection.MINE
-
-	logfile = path +'log.txt'
-	#logging setup
-        logging.basicConfig(filename=logfile,level=logging.INFO)
 
         #for all studies (exclude the file log.txt)
         for file in listing:
@@ -307,24 +419,32 @@ def uploadStudy(studyid):
 				logging.info("trying to read lines")
                                 for line in f:
                                         count = count + 1
-                                        if count > 3:
-						logging.info("reading line " + str(count))
+					
+                                        if count > 1:
+						logging.debug("reading line " + str(count))
                                                 try:
                                                         #insert lines
-							logging.info("splitting line")
+							#logging.debug("splitting line")
                                                         cells = line.split("\t")
-							logging.info("stripping newline char")
+							#logging.debug("stripping newline char")
                                                         cells[-1] = cells[-1].rstrip()
-							logging.info("uploading line")
+							#logging.debug("uploading line")
                                                         #uploadLine(studyid, cells[0], cells[1:])
-                                                        line = {"id": cells[0], "data": cells[1:]}
+                                                        line = {"id": cells[0], "canonical_id":cells[0].upper(), "data": cells[1:]}
 							db[studyid].insert(line)
 
                                                 except:
                                                         logging.error("line " + count + " could not be read")
 					else:
-						logging.info("header line read")
-
+						logging.debug("header line read")
+						gsm_ids = line.split("\t")
+						gsm_ids = gsm_ids[1:]
+						n = 1
+						for id in gsm_ids:
+							more_ids = id.split(";")
+							for x in more_ids:
+								db[studyid+"order"].insert({"no":n,"GSM":x})
+								n+= 1
                                 #close file
 				logging.info("lines successfully read")
                                 logging.info("closing " + file)
@@ -332,12 +452,11 @@ def uploadStudy(studyid):
 
 				#mark request queued
 				markRequestQueued(studyid)
+				db[studyid].ensure_index("canonical_id",1)
                         except:
                                 logging.error("Could not open " + file)
-				Connection.disconnect(connection)
-
-	Connection.disconnect(connection)
-
+		
+       	Connection.disconnect(connection)
                                 
 # uploads pairwise data for a studyid into the database 
 # studyid is required to be a string formatted GSE#####P where # is a decimal digit
@@ -483,22 +602,40 @@ def getCorrespondingVars(studyid, var):
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
 # email is required to be a valid e-mail address
 def downloadAndUpload(studyid, email):
+
+	path = 'Studies/' + studyid + '/'
+	logfile = path +'log.txt'
+        #logging setup                                                                               
+        #create logger                                                                         
+        log = logging.getLogger()
+        log.setLevel(logging.DEBUG)
+
+        #create admin handler                                                                        
+
+        loghand = logging.FileHandler(logfile)
+        loghand.setLevel(logging.DEBUG)
+
+        #create formatter                                                                            
+
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+
+        #set formatter for adhand                                                                    
+
+        loghand.setFormatter(formatter)
+
+        #add adhand to logger                                                                        
+        log.addHandler(loghand)
+
         
 	if re.match("GSE", studyid) and isValidNumber(studyid):
                 #if new request and valid GSE
                 if not alreadyRequested(studyid):
-                    #save request data, download data, upload to server
-
-                    #path = 'Studies/' + studyid +'/'
-		    #logfile = path +'Upload.log'
-                    #logging setup
-		    #logging.basicConfig(filename=logfile,level=logging.INFO)
-
+                    
                     postRequest(studyid, email)
 		    sendEmail([email], studyid, 1)
 		    try:
 			    main(studyid, None, "Studies/" + studyid)
-			    uploadStudy(studyid)
+       			    uploadStudy(studyid)
                             markRequestQueued(studyid)
 			    sendEmail([email], studyid, 3)
 		    except:
@@ -511,3 +648,107 @@ def downloadAndUpload(studyid, email):
 	else:
 		 #email out to list that invalid studyid
 		 sendEmail([email], studyid, 2)
+
+	loghand.flush()
+	loghand.close()
+	log.handlers = []
+
+def packStudyData(studyid):
+	#connect                                                                                      
+        connection = Connection(HOST, PORT)
+        db = connection.MINE
+
+	#get data from database
+	vars = db['GSE' + studyid].find()
+	
+	#open file
+	f=open('GSE' + studyid +'-data.txt','w')
+	
+	#for each gene id
+	for x in vars:
+		#write the id name
+		f.write("%s\t" % x['id'])
+		#for each float in data associated with gene id
+		for token in x['data']:
+			#write floats separated by tabs
+			f.write("%s\t" % token)
+		f.write("\n")
+			
+	f.close()
+	
+	Connection.disconnect(connection)
+
+
+def completeTerm(studyid, term):
+
+	connection = Connection(HOST, PORT)
+        db = connection.MINE
+
+        #get data from database
+
+	search = "^" + str(term)
+	ret = []
+	ret = db[studyid].find({"canonical_id": { '$regex' : search, '$options': 'i'}}).distinct("canonical_id")[:10]
+
+	Connection.disconnect(connection)
+	return ret
+
+def geneExists(studyid, gene):
+
+	connection = Connection(HOST, PORT)
+        db = connection.MINE
+
+        #get data from database                                                 
+	ret = False
+        if db[studyid].find({"canonical_id":gene.upper()}).count() > 0:
+		ret = True
+
+	Connection.disconnect(connection)
+        return ret
+
+def getNumberOfColumns(studyid):
+	connection = Connection(HOST, PORT)
+        db = connection.MINE
+
+        #get data from database                                                                                                                                                                          
+	x = len(db[studyid].find_one()['data'])
+        Connection.disconnect(connection)
+        return x
+
+def getNumberOfRows(studyid):
+	connection = Connection(HOST, PORT)
+	db = connection.MINE
+
+        #get data from database                                                                                                                                                                             
+	
+	ret = db[studyid].find().count()
+        Connection.disconnect(connection)
+        return ret
+
+
+#reads last n lines of a file
+#f is a file object
+#n is required to be an integer greater than 0
+def tail(f, n):
+    assert n >= 0
+    pos, lines = n+1, []
+    while len(lines) <= n:
+        try:
+                f.seek(-pos, 2)
+        except IOError:
+                f.seek(0)
+                break
+        finally:
+                lines = list(f)
+        pos *= 2
+    return lines[-n:]
+
+def getCorrectType(x):
+	if x.isdigit():
+		ret = int(x)
+	else:
+		try:
+			ret = float(x)
+		except ValueError:
+			ret = x
+	return ret

@@ -6,11 +6,25 @@
 <ul id="studies" class="unstyled">
   {% for study, date in data %}
   <li><table>
+      <tr>
+	<td width = 15%>
+	  <a href="/studies/sendStudy/{{study}}" class="btn btn-success">Send</a>
+        </td>
+        <td><table>
       <tr><td width=45%>
-	  <a href=""> Study ID {{study}}</a>
+	   Study ID {{study}}
       </td><td width=55%>
 	  Requested {{date}}
       </td></tr>
+      <tr><table><tr>
+	<td class="done icon" width=25%>downloaded</td>
+	<td class="done icon" width=18%>queued</td>
+	<td class="wait icon" width=12%>sent</td>
+	<td class="wait icon" width=24%>processed</td>
+	<td class="wait icon" width=18%>retrieved</td></tr></table>
+      </tr>
+      </table>
+	  </tr>
       </table>
   </li>
   {% endfor %}
@@ -22,6 +36,12 @@
         {{ form.as_p }}
         <input type="submit" value="Delete" class="btn btn-success" />
 </form>
+<h2> Check Logs </h2> <a href = "http://yates.webfactional.com/studies/adminlog">download</a>
 
+<h3>displaying the last 100 lines of the log</h3>
+
+{% for line in loglines %}
+<p>{{line}}</p>
+{% endfor %}
 
 {% endblock %}

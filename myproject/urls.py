@@ -26,4 +26,12 @@ urlpatterns = patterns('',
     url(r'^studies/downloadLog/GSE(?P<studynumber>\d+)/$', 'application.views.sendLog'),
     url(r'^studies/login/$', 'application.views.login_auth'),
     url(r'^studies/admin/$', 'application.views.admin'),
+    url(r'^studies/adminlog/$', 'application.views.sendadminLog'),
+    url(r'^studies/sendStudy/GSE(?P<studyid>\d+)/$', 'application.views.sendStudy'),
+    url(r'^studies/ac/$', 'application.views.complete'),
+    url(r'^studies/geneExists/$', 'application.views.geneExistance'),
+    url(r'^studies/getChartData/$', 'application.views.getChartData'),
+    url(r'^studies/upload/$', 'application.views.upload_study'),
 )
+
+

@@ -18,24 +18,17 @@
 <center>
   <p><button class="btn btn-success" onclick="addPair(document.getElementById('gene_1').value, document.getElementById('gene_2').value, {{studyid}} )">Plotify</button></p>
 
-
-
+  <p><button onclick="testalert()">Test</button></p>
+  <p><button  onclick="makePlot('hsa-miR-571','hsa-miR-551b','{{studyid}}')">PlotTest</button></p>
   <p id="no-results"></p>
- <p> <select id="selectColorCode">
-    <option value="age">age</option>
-    <option value="gender">gender</option>
-    <option value="ancestry">ancestry</option>
-    <option value="id">id</option>
-    <option value="tissue">tissue</option>
-  </select></p>
+
   <input id="studyid" value="{{studyid}}">
-</center>
 <span>
-<div id="img0" style="height:16px;" >
-<img src="http://www.famfamfam.com/lab/icons/silk/icons/cross.png" align="right" onclick="remove(0)" class="delete0" title="remove graph" >
-<img src="http://www.famfamfam.com/lab/icons/silk/icons/application.png" align="right" onclick="openWindow(0)" title="new window" >
+<div style="height:500px;" id="plot" class="graph0">
+<div id="img0">
+  <img src="http://www.famfamfam.com/lab/icons/silk/icons/cross.png" align="right" onclick="remove(0)" class="delete0" title="remove graph">
+  <img src="http://www.famfamfam.com/lab/icons/silk/icons/application.png" align="right" onclick="openWindow(0)" title="new window">
 </div>
-<div style="height:500px; width:700px;" id="plot" class="graph0">
 </div>
 </span>
 {% endblock %}

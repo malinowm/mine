@@ -43,63 +43,66 @@ def get_samples(request):
     c.update(csrf(request))
     if request.method == 'POST':
         form = ContactForm(request.POST)
-        #if form.is_valid():
-            
+        if form.is_valid():
+            return HttpResponse('submitted')
     form = ContactForm()
 
-    t = loader.get_template('')
-    c = RequestContext(request, {'form':form, 'username':username})
+    t = loader.get_template('samples.html')
+    c = RequestContext(request, {'form':form})
     return HttpResponse(t.render(c))
 
 #upload handles user request to upload new study files
 @csrf_protect
 def upload_study(request):
-
+    notice = "Please use alphanumeric characters spaces or underscores for study names."
     if request.method == 'POST':
         form = UploadForm(request.POST, request.FILES)
         if form.is_valid():
             
-            studyname = form.cleaned_data['Name']
+            studyname = form.cleaned_data['Name'].replace(' ', '_')
+            a = re.compile(r"\w+ \w+ \w+ \w+")
+            if re.match(a,studyname):
             #create logger
-            uplogger = logging.getLogger()
-            uplogger.setLevel(logging.INFO)
-            
+                uplogger = logging.getLogger()
+                uplogger.setLevel(logging.INFO)
+                
         #create admin handler
-            filename = 'Studies/' + studyname +'/log.txt'
-            dir = os.path.dirname(filename)
-            
-            if not os.path.exists(dir):
-                os.makedirs(dir)
-            
-            hand = logging.FileHandler(filename)
-            hand.setLevel(logging.INFO)
-            
+                filename = 'Studies/' + studyname +'/log.txt'
+                dir = os.path.dirname(filename)
+                
+                if not os.path.exists(dir):
+                    os.makedirs(dir)
+                    
+                hand = logging.FileHandler(filename)
+                hand.setLevel(logging.INFO)
+                    
         #create formatter
-            
-            formatter = logging.Formatter('%(asctime)s - %(message)s')
+                    
+                formatter = logging.Formatter('%(asctime)s - %(message)s')
             
         #set formatter for adhand
             
-            hand.setFormatter(formatter)
+                hand.setFormatter(formatter)
             
         #add adhand to logger
-            uplogger.addHandler(hand)
+                uplogger.addHandler(hand)
 
 
-            handle_uploaded_file(request.FILES['File'], studyname)
-            logging.info("File " + studyname +".tab Successfully upload") 
-            postRequest(studyname, form.cleaned_data['Email'])
-            uploadAttrFile(studyname)
-
-            hand.flush()
-            hand.close()
-            uplogger.handlers = []
-
-            return HttpResponse('you did it hurray!')
+                handle_uploaded_file(request.FILES['File'], studyname)
+                logging.info("File " + studyname +".tab Successfully upload") 
+                postRequest(studyname, form.cleaned_data['Email'])
+                thread.start_new_thread(uploadAttrFile, (studyname,))
+                
+                hand.flush()
+                hand.close()
+                uplogger.handlers = []
+                notice = "Successfully uploaded your file";
+            else:
+                notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
     else:
         form = UploadForm()
     t = loader.get_template('upload.html')
-    c = RequestContext(request, {'form':form})
+    c = RequestContext(request, {'form':form, 'notice':notice})
 
     return HttpResponse(t.render(c))
 
@@ -111,7 +114,7 @@ def handle_uploaded_file(f, name):
     if not os.path.exists(dir):
         os.makedirs(dir)
 
-    with open(filename, 'wb+') as destination:
+    with open(filename, 'w+') as destination:
         for chunk in f.chunks():
             destination.write(chunk)
 
@@ -323,9 +326,9 @@ def data(request, studynumber):
         adhand.flush()
         adhand.close()
         try:
-            columns = getNumberOfColumns("GSE" + str(studynumber))
-            rows = getNumberOfRows("GSE" + str(studynumber))
-            date = getDateRequested("GSE" + str(studynumber))
+            columns = getNumberOfColumns(str(studynumber))
+            rows = getNumberOfRows(str(studynumber))
+            date = getDateRequested(str(studynumber))
             
         #send http response back to user
             t = loader.get_template('index.html')
@@ -339,7 +342,7 @@ def data(request, studynumber):
         logger.handlers = []
         adhand.flush()
         adhand.close()
-        return HttpResponseRedirect('../login')
+        return HttpResponseRedirect('../../login')
 
 #list handles requests for the requested studies page
 def list(request):
@@ -518,11 +521,11 @@ def send_zipfile(request, studynumber):
         #add adhand to logger                                                                        
     logger.addHandler(adhand)
 
-    logger.info("user has downloaded the study data for GSE" + studynumber)
+    logger.info("user has downloaded the study data for " + studynumber)
     temp = tempfile.TemporaryFile()
     archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
     
-    path = 'Studies/GSE' + studynumber + '/'
+    path = 'Studies/' + studynumber + '/'
     listing = os.listdir(path)
     for file in listing:
         filename = file # Select your files here.                           
@@ -530,7 +533,7 @@ def send_zipfile(request, studynumber):
     archive.close()
     wrapper = FileWrapper(temp)
     response = HttpResponse(wrapper, content_type='application/zip')
-    name = 'attachment; filename=GSE' + studynumber + '.zip'
+    name = 'attachment; filename=' + studynumber + '.zip'
     response['Content-Disposition'] = name
     response['Content-Length'] = temp.tell()
     temp.seek(0)
@@ -570,11 +573,11 @@ def sendAllPairs(request, studynumber):
         #add adhand to logger                                                                        
     logger.addHandler(adhand)
 
-    logger.info("user has downloaded the allpairs data for GSE" + studynumber)
+    logger.info("user has downloaded the allpairs data for " + studynumber)
     temp = tempfile.TemporaryFile()
     archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
 
-    path = 'Studies/GSE' + studynumber + 'P/'
+    path = 'Studies/' + studynumber + 'P/'
     listing = os.listdir(path)
     for file in listing:
         filename = file # Select your files here.
@@ -582,7 +585,7 @@ def sendAllPairs(request, studynumber):
     archive.close()
     wrapper = FileWrapper(temp)
     response = HttpResponse(wrapper, content_type='application/zip')
-    name = 'attachment; filename=GSE' + studynumber + '-allpairs.zip'
+    name = 'attachment; filename=' + studynumber + '-allpairs.zip'
     response['Content-Disposition'] = name
     response['Content-Length'] = temp.tell()
     temp.seek(0)
@@ -622,18 +625,18 @@ def sendLog(request, studynumber):
         #add adhand to logger                                                                        
     logger.addHandler(adhand)
 
-    logger.info("user has downloaded the log for GSE" + studynumber)
+    logger.info("user has downloaded the log for " + studynumber)
 
     temp = tempfile.TemporaryFile()
     archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
 
-    path = 'Studies/GSE' + studynumber + '/'
+    path = 'Studies/' + studynumber + '/'
     filename = 'log.txt' # Select your files here.
     archive.write(path + filename, filename) #studyid = 'filename'
     archive.close()
     wrapper = FileWrapper(temp)
     response = HttpResponse(wrapper, content_type='application/zip')
-    name = 'attachment; filename=GSE' + studynumber + '-logfile.zip'
+    name = 'attachment; filename=' + studynumber + '-logfile.zip'
     response['Content-Disposition'] = name
     response['Content-Length'] = temp.tell()
     temp.seek(0)

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load staticfiles %}
 {% block content %}
+{{ notice }}
 <form enctype="multipart/form-data" id="studyinput" action="." method="post">
         {% csrf_token %}
         {{ form.as_p }}

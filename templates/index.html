@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load staticfiles %}
 {% block content %}
-<h2 align="center" >Study GSE{{studyid}}</h2>
+<h2 align="center" >Study {{studyid}}</h2>
 <table width = 700px>
   <tr>
     <td width=33%>variables: {{rows}}</td>
@@ -16,20 +16,18 @@
   </tr>
 </table>
 <center>
-  <p><button class="btn btn-success" onclick="addPair(document.getElementById('gene_1').value, document.getElementById('gene_2').value, {{studyid}} )">Plotify</button></p>
+  <p><button class="btn btn-success" onclick="addPair(document.getElementById('gene_1').value, document.getElementById('gene_2').value, '{{studyid}}' )">Plotify</button></p>
 
-
+<button onclick="testAlert('this1','this2', '{{studyid}}' )">TEST</button>
 
   <p id="no-results"></p>
  <p> <select id="selectColorCode">
-    <option value="age">age</option>
-    <option value="gender">gender</option>
-    <option value="ancestry">ancestry</option>
-    <option value="id">id</option>
-    <option value="tissue">tissue</option>
-  </select></p>
+</select></p>
   <input id="studyid" value="{{studyid}}">
 </center>
+<table><tr><td><div style="max-height:200px;min-height:50px;overflow:auto;width:300px;" id="list" class="list0"></div></td><td>
+<div style="height:200px;width:400px;" id="hist" class="hist0">
+</div></td></tr></table>
 <span>
 <div id="img0" style="height:16px;" >
 <img src="http://www.famfamfam.com/lab/icons/silk/icons/cross.png" align="right" onclick="remove(0)" class="delete0" title="remove graph" >

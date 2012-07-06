@@ -71,8 +71,8 @@ def uploadAttrFile(studyid):
     #for each dict add id-GSM entry and insert
     logging.info("all lines successfully read")
     for entry in attrlist:
-        gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
-        entry['GSM'] = gsm_id
+        #gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
+        #entry['GSM'] = gsm_id
         db[studyid+'GSM'].insert(entry)
 
     logging.info("data has been uploaded to database")

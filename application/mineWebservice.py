@@ -15,6 +15,37 @@ import time
 HOST = '127.0.0.1'
 PORT = 27017
 
+def writeAttrFile(f, studyid):
+    #open file for writing
+    #f = open(studyid +'.attr', 'w')
+
+    #query database for all attributes
+
+    #connection to the database                                                
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+    attributes = db[studyid+'GSM'].find_one().keys()
+
+    samples = db[studyid+'order'].find().distinct('GSM')
+    #write attributes to file in form attribute_(attr) # # # #  where #'s are the sample's attributes and attr is the attribute name
+
+    for attr in attributes:
+
+        if not attr == '_id' and not attr == 'GSM':
+            f.write('attribute_'+attr)
+            for sample in samples:
+                sample = sample.rstrip()
+                samp = db[studyid+'GSM'].find({"geo_accession":sample}).distinct(attr)
+                if samp[0]:
+                    f.write('\t' + samp[0].encode('utf-8'))
+                    for x in samp[1:]:
+                        f.write(',' +x.encode('utf-8'))
+            f.write('\n')
+
+    Connection.disconnect(connection)
+    #f.close()
+
 def uploadAttrFile(studyid):
 
     #connection to the database

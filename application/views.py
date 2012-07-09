@@ -16,6 +16,7 @@ import re
 from django.contrib.auth import authenticate, login
 import logging
 
+
 HOST = '127.0.0.1'
 PORT = 27017
 connection = Connection(HOST, PORT)
@@ -40,15 +41,40 @@ class UploadForm(forms.Form):
 @csrf_protect
 def get_samples(request):
     c = {}
+    notice = ""
     c.update(csrf(request))
     if request.method == 'POST':
         form = ContactForm(request.POST)
         if form.is_valid():
-            return HttpResponse('submitted')
+
+            study = form.cleaned_data['Study']
+            email = form.cleaned_data['Email']
+
+            if alreadyRequested(study):
+                temp = tempfile.NamedTemporaryFile()
+
+                archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
+                writeAttrFile(temp, study)
+                archive.write(temp.name)
+                archive.close()
+                filename = temp.name # Select your files here.
+                wrapper = FileWrapper(temp)
+                response = HttpResponse(wrapper, content_type='application/zip')
+                name = 'attachment; filename=' + study + '-attrData.zip'
+                response['Content-Disposition'] = name
+                response['Content-Length'] = temp.tell()
+                temp.seek(0)
+            
+
+                return response
+            else:
+                notice = "The Study that you have requested to download attribute data for does not exist in our database"
+        else:
+            notice = "The information that You have entered is incorrect"
     form = ContactForm()
 
     t = loader.get_template('samples.html')
-    c = RequestContext(request, {'form':form})
+    c = RequestContext(request, {'form':form, 'notice':notice})
     return HttpResponse(t.render(c))
 
 #upload handles user request to upload new study files

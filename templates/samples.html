@@ -5,6 +5,7 @@
 <form id="studyinput" action="." method="post">
 	{% csrf_token %}
 	{{ form.as_p }}
-	<input type="submit" value="Get Sample Data" class="btn btn-success" />
+	<input type="submit" value="Get Sample Data" class="btn btn-success" onclick="pleaseWait()"/>
 </form>
+<p id='wait' style="visibility:hidden;"> Please wait, it may take us a moment to prepare your download</p>
 {% endblock %}

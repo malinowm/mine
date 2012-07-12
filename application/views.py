@@ -85,8 +85,9 @@ def upload_study(request):
         form = UploadForm(request.POST, request.FILES)
         if form.is_valid():
             
+            email = form.cleaned_data['Email']
             studyname = form.cleaned_data['Name'].replace(' ', '_')
-            a = re.compile(r"\w+ \w+ \w+ \w+")
+            a = re.compile(r"\w+")
             if re.match(a,studyname):
             #create logger
                 uplogger = logging.getLogger()
@@ -116,13 +117,13 @@ def upload_study(request):
 
                 handle_uploaded_file(request.FILES['File'], studyname)
                 logging.info("File " + studyname +".tab Successfully upload") 
-                postRequest(studyname, form.cleaned_data['Email'])
-                thread.start_new_thread(uploadAttrFile, (studyname,))
+                postRequest(studyname, email)
+                thread.start_new_thread(uploadAttrFile, (studyname, email))
                 
                 hand.flush()
                 hand.close()
                 uplogger.handlers = []
-                notice = "Successfully uploaded your file";
+                notice = "Successfully began uploading your file, you will recieve and e-mail when it is done";
             else:
                 notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
     else:
@@ -244,7 +245,7 @@ def admin(request):
 
         #get last 100 lines of the admin.log file
         loglines = tail(open('Studies/admin.log'), 100)
-
+        loglines.reverse()
         # return http response back to user
 
         form = RemovalForm()
@@ -361,7 +362,9 @@ def data(request, studynumber):
             c = RequestContext(request, {'studyid':studynumber,'columns':columns, 'rows':rows, 'date':date})
             return HttpResponse(t.render(c))
         except:
-            return HttpResponse("this Study has not yet been processed and is not available for review")
+            t = loader.get_template('studyerror.html')
+            c = RequestContext(request, {})
+            return HttpResponse(t.render(c))
 
     else:
         logger.info('anonymous user has been redirected to login page')
@@ -518,6 +521,17 @@ def about(request):
     else:
         return HttpResponseRedirect('../login')
 
+def studyerror(request):
+    
+    if request.user.is_authenticated():
+        # return htp response back to user
+        t = loader.get_template('studyerror.html')
+        c = RequestContext(request, {})
+        return HttpResponse(t.render(c))
+    
+    else:
+        return HttpResponseRedirect('../login')
+    
 #send_zipfile handles requests to download Study Data
 #studynumber is required to be a string containing a valid GSE id of the form GSE##### where # is a decimal digit
 def send_zipfile(request, studynumber):
@@ -744,7 +758,7 @@ def formatData(request):
                     data.append(result)
         except:
             data = [{"this":"is_wrong"}]
-        return HttpResponse(simplejson.dumps({"data": data}),mimetype="application/json")
+        return HttpResponse(simplejson.dumps(data),mimetype="application/json")
 
 def sendStudy(request, studyid):
     packStudyData(studyid)
@@ -774,4 +788,13 @@ def getChartData(request):
         #ret = [{gene_x:gene_y, studyid:"this"}]
     except:
         ret = [{"this":"is_wrong"}]
+    return HttpResponse(simplejson.dumps(ret),mimetype="application/json")
+    
+def getAttrData(request):
+    studyid = request.GET.get('studyid');
+    
+    try:
+        ret = retrieveAttrData(studyid)
+    except:
+        ret = [{"this":"is_incorrect"}]
     return HttpResponse(simplejson.dumps(ret),mimetype="application/json")

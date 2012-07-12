@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+
+<h3>There was an error accessing the Study you wish to view</h3>
+
+This could be due to
+<ul>
+  <li> The study has not yet been uploaded into our database</li>
+  <li> You have misspelled the study name in the url</li>
+  <li> The data we downloaded/you uploaded was in an unexpected format or did not contain enough data to create a visualization</li>
+</ul>
+
+
+{% endblock %}

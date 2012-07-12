@@ -39,14 +39,12 @@ def writeAttrFile(f, studyid):
                 samp = db[studyid+'GSM'].find({"geo_accession":sample}).distinct(attr)
                 if samp[0]:
                     f.write('\t' + samp[0].encode('utf-8'))
-                    for x in samp[1:]:
-                        f.write(',' +x.encode('utf-8'))
             f.write('\n')
 
     Connection.disconnect(connection)
     #f.close()
 
-def uploadAttrFile(studyid):
+def uploadAttrFile(studyid, email):
 
     #connection to the database
     connection = Connection(HOST, PORT)
@@ -83,9 +81,6 @@ def uploadAttrFile(studyid):
                 #line is attribute line
                     no = 0
                     for cell in data[1:]:
-                        #make list out of attributes separated by ,'s
-                        if cell.find(',') > 0:
-                            cell = cell.split(',')
                         #ready denotes weather or not all dicts have been initialized or not
                         if ready == 0:
                             attrlist.append({})
@@ -108,6 +103,7 @@ def uploadAttrFile(studyid):
 
     logging.info("data has been uploaded to database")
     markRequestQueued(studyid)
+    sendEmail([email], studyid, 5)
     Connection.disconnect(connection)
     #close and delete the file
     f.close()
@@ -263,7 +259,12 @@ def isValidNumber(studyid):
         #exit on failure
         return False
     #change directory to folder containing GSE folders
-    ftp.cwd('/pub/geo/DATA/SeriesMatrix/')
+    try:
+        ftp.cwd('/pub/geo/DATA/SeriesMatrix/')
+    except:
+        ftp.quit()
+        return False
+
     try:
         #try changing directory into studyid folder
         ftp.cwd(studyid)
@@ -301,7 +302,11 @@ def sendEmail(addresses, studyid, type = 0):
     elif type == 4:
         SUBJECT = 'Mine was unable to queue your study'
         MESSAGE = 'Your request for study ' + studyid + ' was not successfully queued. There was an error downloading the file and uploading it to our database. Please try downloading again. If this error persists please contact us at ##INSERT EMAIL ADDRESS FOR CONTACTING HERE##'
+    elif type == 5:
+        SUBJECT = 'Mine has finished uploading and processing your file'
+        MESSAGE = 'Your study ' + studyid + 'has been successfully uploaded to our servers. You may now go view your data at http://yates.webfactional.com/studies/view/' + studyid
     SENDER = 'noreply@yates.webfactional.com'
+    
 
     for address in addresses:
 	    #setup and send the e-mail
@@ -394,7 +399,45 @@ def RetrieveData(studyid, id):
 				f = item = 0.00
 			ret.append(f)
 	return ret
+
+def retrieveAttrData(studyid):
+    #connect                                                               \
+
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+    attributes = list(db[studyid+'GSM'].find_one().keys())
+    wantedAttrs = []
+    for attribute in attributes:
+        x = db[studyid+'GSM'].find().distinct(attribute)
+        if (len(x) > 1) and not (attribute == '_id') :
+            wantedAttrs.append(attribute)
+
+    n = 1
+    ret = []
+    times = db[studyid].find_one()['data']
+    for x in times:
+        next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
+        data = {}
+        entry = {}
+        for attr in wantedAttrs:
+        #attr = "tissue"
+            data[attr] = getCorrectType(list(db[studyid+"GSM"].find({"geo_accession":next}).distinct(attr))[0])
+            
+                #change list of characteristics to dict
+                
+        data['id'] = next
+        entry["sample"] = data
+        ret.append(entry)
+        n+=1
+
+        #disconnect                                                           
+    Connection.disconnect(connection)
+    return ret
+
+
 def retrieveChartData(studyid, gene_x, gene_y):
+
 	#connect                                                                                                                         
         connection = Connection(HOST, PORT)
         db = connection.MINE
@@ -402,23 +445,25 @@ def retrieveChartData(studyid, gene_x, gene_y):
 	x = list( db[studyid].find({"canonical_id":gene_x.upper()}) )[0]['data']
 	y = list( db[studyid].find({"canonical_id":gene_y.upper()}) )[0]['data']
 
+        attributes = db[studyid+'GSM'].find_one().keys()
+
         n = 1
 	ret = []
 	for t in x:
 		entry = {}
 		next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
-		data = db[studyid +"GSM"].find({"geo_accession":next}).distinct("characteristics_ch1")
-		
+		data = {}
+		for attr in attributes:
+                    if not isUnwantedAttr(attr):
+                        data[attr] = getCorrectType(list(db[studyid+"GSM"].find({"geo_accession":next}).distinct(attr))[0])
+                                               
 		#change list of characteristics to dict
-		sample = {}
-		for item in data:
-			pair = item.split(": ")
-			sample[pair[0]] = getCorrectType(pair[1])
-		sample['id'] = next
+		
+		data['id'] = next
 		entry["y"] = getCorrectType(y[n-1])
 		entry["x"] = getCorrectType(x[n-1])
-		entry["sample"] = sample
-		ret.append(entry)
+		entry["sample"] = data
+		ret.append(entry) 
 		n+=1
 
         #disconnect                                                                                                                      
@@ -428,6 +473,19 @@ def retrieveChartData(studyid, gene_x, gene_y):
 
 # uploads all the files for a studyid into database line by line.
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
+
+def isUnwantedAttr(attr):
+    unwanted = ['contact', 'city', 'processing', 'file', 'protocol', 'data_row', 'update', 'source_name', 'platform', 'taxid_ch1', 'submission_date', 'description']
+    ret = False
+
+    for item in unwanted:
+        if re.search(item, attr):
+            ret = True
+            break
+    if attr == '_id':
+        ret = True
+    return ret
+
 def uploadStudy(studyid):
 
         #path for study files
@@ -468,7 +526,7 @@ def uploadStudy(studyid):
                                                         logging.error("line " + count + " could not be read")
 					else:
 						logging.debug("header line read")
-						gsm_ids = line.split("\t")
+						gsm_ids = line.rstrip().split("\t")
 						gsm_ids = gsm_ids[1:]
 						n = 1
 						for id in gsm_ids:
@@ -657,32 +715,34 @@ def downloadAndUpload(studyid, email):
         #add adhand to logger                                                                        
         log.addHandler(loghand)
 
-        
-	if re.match("GSE", studyid) and isValidNumber(studyid):
+        logging.info('checking regex and file existance')
+	if re.match("GSE", studyid): #and isValidNumber('studyid')
                 #if new request and valid GSE
-                if not alreadyRequested(studyid):
-                    
-                    postRequest(studyid, email)
-		    sendEmail([email], studyid, 1)
-		    try:
-			    main(studyid, None, "Studies/" + studyid)
-       			    uploadStudy(studyid)
-                            markRequestQueued(studyid)
-			    sendEmail([email], studyid, 3)
-		    except:
-			    sendEmail([email], studyid, 4)
-			    removeByNumber(studyid)
+            logging.info('regex matched and file exists')
+            if not alreadyRequested(studyid):
+                logging.info('sending email')
+                postRequest(studyid, email)
+                sendEmail([email], studyid, 1)
+                try:
+                    main(studyid, None, "Studies/" + studyid)
+                    uploadStudy(studyid)
+                    markRequestQueued(studyid)
+                    sendEmail([email], studyid, 3)
+                except:
+                    sendEmail([email], studyid, 4)
+                    removeByNumber(studyid)
 		    
-		else:
+            else:
 			#add email request to email list in database
-			addAddress(studyid, email)
+                logging.info('already requested')
+                addAddress(studyid, email)
 	else:
 		 #email out to list that invalid studyid
-		 sendEmail([email], studyid, 2)
-
-	loghand.flush()
-	loghand.close()
-	log.handlers = []
+            sendEmail([email], studyid, 2)
+            
+        loghand.flush()
+        loghand.close()
+        log.handlers = []
 
 def packStudyData(studyid):
 	#connect                                                                                      

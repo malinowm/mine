@@ -38,6 +38,8 @@ urlpatterns = patterns('',
     url(r'^studies/getChartData/$', 'application.views.getChartData'),
     url(r'^studies/upload/$', 'application.views.upload_study'),
     url(r'^studies/downloadsamples/$', 'application.views.get_samples'),
+    url(r'^studies/getAttrData/$', 'application.views.getAttrData'),
+    url(r'^studies/studyerror/$', 'application.views.studyerror'),
 )
 
 

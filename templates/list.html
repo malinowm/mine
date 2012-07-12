@@ -8,7 +8,6 @@
       <a class="download icon" href='/studies/download/{{study}}'>Study Data</a>
       <a class="log icon" href='/studies/downloadLog/{{study}}'>Log</a>
       <a class="visual icon" href='/studies/view/{{study}}'>Visualization</a>
-      <a class="allpairs icon" href='/studies/downloadAllPairs/{{study}}'>All Pairs Data</a>
     </li>
     {% endfor %}
     {% for study in queuedlist %}
@@ -16,8 +15,7 @@
       <span>Study ID {{study}}</span>
       <a class="download icon" href='/studies/download/{{study}}'>Study Data</a>
       <a class="log icon" href='/studies/downloadLog/{{study}}'>Log</a>
-      <a class="visualno icon">Visualization</a>
-      <a class="allpairsno icon">All Pairs Data</a>
+      <a class="visual icon" href='/studies/view/{{study}}'>Visualization</a>
     </li>
     {% endfor %}
     {% for study in waitlist %}
@@ -26,7 +24,6 @@
       <a class="downloadno icon" >Study Data</a>
       <a class="logno icon" >Log</a>
       <a class="visualno icon">Visualization</a>
-      <a class="allpairsno icon">All Pairs Data</a>
     </li>
     {% endfor %}
 

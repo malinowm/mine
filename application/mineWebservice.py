@@ -10,17 +10,66 @@ import string
 from ftplib import FTP
 from geo_api.script import *
 import time
+from subprocess import Popen, PIPE, STDOUT
+from geo_api.geo import GSE
 
 #connection info
 HOST = '127.0.0.1'
 PORT = 27017
 
+logger = logging.getLogger('admin')
+
+def getAttributeData(studyid):
+
+    gse = GSE(studyid)
+
+    if gse.type == "SUPER":
+        for g in gse.substudies.values():
+            if g.type != "eQTL":
+                continue
+            uploadAttrData(studyid, g)
+    else:
+        uploadAttrData(studyid, gse)
+
+def uploadAttrData(studyid, gse):
+
+    #connection to the database
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+    collection = str(studyid) + "GSM"
+    logger.debug("got collection")
+    n = 0
+    for x, sample  in gse.samples.items():
+        logger.debug("new iteration")
+        document = {}
+        logger.debug("new document #" + str(n))
+        for name, value in sample.attr.items():
+            if len(value) < 2:
+                logger.debug("length is less than 2")
+                document[name] = value
+            else:
+                logger.debug("length is not less than 2")
+                first = True
+                for item in value:
+                    if re.search(": ", item):
+                        logging.debug("splitting")
+                        items = item.split(': ')
+                        logger.debug("adding to document")
+                        document[items[0]] = items[1]
+                    else:
+                        if first:
+                            document[name] = item
+                        else:
+                            document[name] = document[name] + "      " + item
+        logger.debug("adding new name value pair")
+        db[collection].insert(document)
+        n+=1
+    #db[collection].ensure_index("geo_accession",1)
+    logger.info("disconnecting from server")
+    Connection.disconnect(connection)
+
 def writeAttrFile(f, studyid):
-    #open file for writing
-    #f = open(studyid +'.attr', 'w')
-
-    #query database for all attributes
-
     #connection to the database                                                
     connection = Connection(HOST, PORT)
     db = connection.MINE
@@ -52,58 +101,65 @@ def uploadAttrFile(studyid, email):
 
     filepath = 'Studies/' + studyid +'/' + studyid + '.tab'
     f = open(filepath)
-    logging.info(studyid + ".tab has been successfully open")
+    logger.info(studyid + ".tab has been successfully open")
     attrlist = []
     ready = 0
+    lineno = 1
     for line in f:
-        #remove trailing newline character
-        line = line.rstrip()
-        if line[0] == '#':
+        try:
+
+           #remove trailing newline character
+            line = line.rstrip()
+            if line[0] == '#':
             #line is header line
-            gsm_ids = line.split("\t")
-            gsm_ids = gsm_ids[1:]
-            n = 1
-            for id in gsm_ids:
+                gsm_ids = line.split("\t")
+                gsm_ids = gsm_ids[1:]
+                n = 1
+                for id in gsm_ids:
                 #check ids for semicolon separators
-                more_ids = id.split(";")
-                for x in more_ids:
+                    more_ids = id.split(";")
+                    for x in more_ids:
                     #insert ids into database with no to keep order
-                    db[studyid+"order"].insert({"no":n,"GSM":x})
-                    n+=1
-        else:
+                        db[studyid+"order"].insert({"no":n,"GSM":x})
+                        n+=1
+                    else:
             #check for attribute line
-
-            data = line.split("\t")
-
-            result = re.match("attribute_", data[0])
-
-            if result:
+                        
+                        data = line.split("\t")
+                        
+                        result = re.match("attribute_", data[0])
+                        
+                        if result:
                 #line is attribute line
-                    no = 0
-                    for cell in data[1:]:
+                            no = 0
+                            for cell in data[1:]:
                         #ready denotes weather or not all dicts have been initialized or not
-                        if ready == 0:
-                            attrlist.append({})
-                            attrlist[no][(data[0][10:])] = cell
-                        else:
-                            attrlist[no][(data[0][10:])] = cell
-                        no+=1
-                    ready = 1
+                                if ready == 0:
+                                    attrlist.append({})
+                                    attrlist[no][(data[0][10:])] = cell
+                                else:
+                                    attrlist[no][(data[0][10:])] = cell
+                                    no+=1
+                                    ready = 1
             else:
                 #line is id/float data line
                 db[studyid].insert({"id":data[0], "canonical_id":data[0].upper(), "data":data[1:]})
-
+        except:
+            logger.info("error reading line no " + str(lineno) + ". check formatting")
+        lineno += 1
     no = 1
     #for each dict add id-GSM entry and insert
-    logging.info("all lines successfully read")
+    logger.info("done parsing file")
     for entry in attrlist:
         #gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
         #entry['GSM'] = gsm_id
         db[studyid+'GSM'].insert(entry)
 
-    logging.info("data has been uploaded to database")
+    logger.info("data from " + studyid + " has been uploaded to database")
     markRequestQueued(studyid)
+    logger.info("sending email to notify user data is done uploading")
     sendEmail([email], studyid, 5)
+    logger.removeHandler(logger.handlers[1])
     Connection.disconnect(connection)
     #close and delete the file
     f.close()
@@ -201,6 +257,7 @@ def getStudyList():
         db = connection.MINE
 	#get list of distinct GSEids
         x = db.request.find().distinct("gse")
+        x.reverse()
 	#disconnect
         Connection.disconnect(connection)
         return x
@@ -213,6 +270,7 @@ def getQueuedStudyList():
 	#get list of distinct queued GSEids
 	x = db.request.find({"queued":True}).distinct("gse")
 	#disconnect
+        x.reverse()
         Connection.disconnect(connection)
         return x
 
@@ -233,7 +291,8 @@ def getProcessedStudyList():
         db = connection.MINE
 	# get list of distinct processed GSEids
 	x =  db.request.find({"processed":True}).distinct("gse")
-	#disconnect
+	x.reverse()
+        #disconnect
         Connection.disconnect(connection)
         return x
 
@@ -244,6 +303,7 @@ def getWaitingStudyList():
         db = connection.MINE
 	# get list of distinct processed GSEids
 	x =  db.request.find({"processed":False, "queued":False}).distinct("gse")
+        x.reverse()
 	#disconnect
         Connection.disconnect(connection)
         return x
@@ -410,7 +470,7 @@ def retrieveAttrData(studyid):
     wantedAttrs = []
     for attribute in attributes:
         x = db[studyid+'GSM'].find().distinct(attribute)
-        if (len(x) > 1) and not (attribute == '_id') :
+        if len(x) > 1 and not attribute == '_id' :
             wantedAttrs.append(attribute)
 
     n = 1
@@ -497,20 +557,20 @@ def uploadStudy(studyid):
 
         #for all studies (exclude the file log.txt)
         for file in listing:
-                if not file == 'log.txt':
+                if not file == 'log.txt' and not file == 'logx.txt':
                         try:
                                 #open the file
-                                logging.info("trying to open " + file)
+                                logger.info("trying to open " + file)
                                 f = open(path + file)
                                 count = 0
 
                                 #for each line after the header
-				logging.info("trying to read lines")
+				logger.info("trying to read lines")
                                 for line in f:
                                         count = count + 1
 					
                                         if count > 1:
-						logging.debug("reading line " + str(count))
+						logger.debug("reading line " + str(count))
                                                 try:
                                                         #insert lines
 							#logging.debug("splitting line")
@@ -525,7 +585,7 @@ def uploadStudy(studyid):
                                                 except:
                                                         logging.error("line " + count + " could not be read")
 					else:
-						logging.debug("header line read")
+						logger.debug("header line read")
 						gsm_ids = line.rstrip().split("\t")
 						gsm_ids = gsm_ids[1:]
 						n = 1
@@ -535,15 +595,15 @@ def uploadStudy(studyid):
 								db[studyid+"order"].insert({"no":n,"GSM":x})
 								n+= 1
                                 #close file
-				logging.info("lines successfully read")
-                                logging.info("closing " + file)
+				logger.info("lines successfully read")
+                                logger.info("closing " + file)
                                 f.close()
 
 				#mark request queued
 				markRequestQueued(studyid)
 				db[studyid].ensure_index("canonical_id",1)
                         except:
-                                logging.error("Could not open " + file)
+                                logger.error("Error parsing file  " + file + "See last line to see where program failed")
 		
        	Connection.disconnect(connection)
                                 
@@ -691,16 +751,14 @@ def getCorrespondingVars(studyid, var):
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
 # email is required to be a valid e-mail address
 def downloadAndUpload(studyid, email):
-
 	path = 'Studies/' + studyid + '/'
-	logfile = path +'log.txt'
-        #logging setup                                                                               
-        #create logger                                                                         
-        log = logging.getLogger()
-        log.setLevel(logging.DEBUG)
-
-        #create admin handler                                                                        
-
+	logfile = path +'logx.txt'
+        #create handler and add dir if doesn't exist
+        dir = os.path.dirname(path)
+        
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+             
         loghand = logging.FileHandler(logfile)
         loghand.setLevel(logging.DEBUG)
 
@@ -708,41 +766,55 @@ def downloadAndUpload(studyid, email):
 
         formatter = logging.Formatter('%(asctime)s - %(message)s')
 
-        #set formatter for adhand                                                                    
-
+        #set formatter for loghand
         loghand.setFormatter(formatter)
+        #add loghand to logger                                                                        
+        logger.addHandler(loghand)
 
-        #add adhand to logger                                                                        
-        log.addHandler(loghand)
-
-        logging.info('checking regex and file existance')
-	if re.match("GSE", studyid): #and isValidNumber('studyid')
+        logger.info('checking regex and file existance')
+	if re.match("GSE", studyid) and isValidNumber(studyid):
                 #if new request and valid GSE
             logging.info('regex matched and file exists')
             if not alreadyRequested(studyid):
-                logging.info('sending email')
+                logger.info('sending email to notify attempt to download and marking requested')
                 postRequest(studyid, email)
                 sendEmail([email], studyid, 1)
                 try:
-                    main(studyid, None, "Studies/" + studyid)
-                    uploadStudy(studyid)
-                    markRequestQueued(studyid)
-                    sendEmail([email], studyid, 3)
+                    logger.info('attempting to download to server')
+                    #main(studyid, None, "Studies/" + studyid)
+                    cmd = "python webapps/mine/myproject/application/geo_api/script.py " + str(studyid) + " out_dir=Studies/" + str(studyid)
+                    p = Popen(cmd, shell=True, stdin=PIPE, stdout=PIPE, stderr=STDOUT,close_fds=True)
+                    stderr = p.stdout.read()
+                    if p.wait() != 0:
+                        logger.info('stderr = ' + stderr)
+                    else:
+                        logger.info('attempting to upload gene data to database')
+                        uploadStudy(studyid)
+                        logger.info('attempting to upload sample data to database')
+                        getAttributeData(studyid)
+                        logger.info('marking request as queued')
+                        markRequestQueued(studyid)
+                        logger.info('sending email to notify that study has been queued')
+                        sendEmail([email], studyid, 3)
                 except:
+                    stderr = p.stdout.read()
+                    logger.info(stderr)
+                    logger.info('error downloading or uploading, see previous line of log, notifying user via email')
                     sendEmail([email], studyid, 4)
+                    logger.info('removing request so user may try requesting again')
                     removeByNumber(studyid)
 		    
             else:
 			#add email request to email list in database
-                logging.info('already requested')
+                logger.info('that study has already been requested')
+                logger.info('add user to email list to notify for further updates')
                 addAddress(studyid, email)
 	else:
 		 #email out to list that invalid studyid
+            logger.info('notifying user that invalid studyid was entered')
             sendEmail([email], studyid, 2)
             
-        loghand.flush()
-        loghand.close()
-        log.handlers = []
+        logger.removeHandler(loghand)
 
 def packStudyData(studyid):
 	#connect                                                                                      

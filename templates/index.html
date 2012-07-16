@@ -16,7 +16,8 @@
   </tr>
 </table>
 <center>
-  <p><button class="btn btn-success" onclick="addPair(document.getElementById('gene_1').value, document.getElementById('gene_2').value, '{{studyid}}' )">Plotify</button></p>
+  <div id="wait"><p> Please wait while we gather sample data for this study</p></div>
+  <p><button class="btn btn-success" id="plotify" onclick="addPair(document.getElementById('gene_1').value, document.getElementById('gene_2').value, '{{studyid}}' )">Plotify</button></p>
 
   <p id="no-results"></p>
  <p> <select id="selectColorCode">

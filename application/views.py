@@ -16,6 +16,7 @@ import re
 from django.contrib.auth import authenticate, login
 import logging
 
+logger = logging.getLogger('admin')
 
 HOST = '127.0.0.1'
 PORT = 27017
@@ -52,7 +53,7 @@ def get_samples(request):
 
             if alreadyRequested(study):
                 temp = tempfile.NamedTemporaryFile()
-
+                logger.info("user has downloaded the attribute data for study " + study)
                 archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
                 writeAttrFile(temp, study)
                 archive.write(temp.name)
@@ -68,6 +69,7 @@ def get_samples(request):
 
                 return response
             else:
+                logger.info("user has requested to download attribute data for study " + study + " but it does not exist in our database")
                 notice = "The Study that you have requested to download attribute data for does not exist in our database"
         else:
             notice = "The information that You have entered is incorrect"
@@ -89,11 +91,8 @@ def upload_study(request):
             studyname = form.cleaned_data['Name'].replace(' ', '_')
             a = re.compile(r"\w+")
             if re.match(a,studyname):
-            #create logger
-                uplogger = logging.getLogger()
-                uplogger.setLevel(logging.INFO)
-                
-        #create admin handler
+            
+        #create handler
                 filename = 'Studies/' + studyname +'/log.txt'
                 dir = os.path.dirname(filename)
                 
@@ -102,27 +101,21 @@ def upload_study(request):
                     
                 hand = logging.FileHandler(filename)
                 hand.setLevel(logging.INFO)
-                    
-        #create formatter
-                    
+                   
+        #create formatter     
                 formatter = logging.Formatter('%(asctime)s - %(message)s')
             
-        #set formatter for adhand
-            
+        #set formatter for hand    
                 hand.setFormatter(formatter)
             
-        #add adhand to logger
-                uplogger.addHandler(hand)
-
+        #add hand to logger
+                logger.addHandler(hand)
 
                 handle_uploaded_file(request.FILES['File'], studyname)
-                logging.info("File " + studyname +".tab Successfully upload") 
+                logger.info("File " + studyname +".tab Successfully uploaded to temp file")
                 postRequest(studyname, email)
                 thread.start_new_thread(uploadAttrFile, (studyname, email))
-                
-                hand.flush()
-                hand.close()
-                uplogger.handlers = []
+            
                 notice = "Successfully began uploading your file, you will recieve and e-mail when it is done";
             else:
                 notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
@@ -149,24 +142,6 @@ def handle_uploaded_file(f, name):
 @csrf_protect
 def login_auth(request):
 
-    #create logger                                                                                
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                         
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                             
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                     
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                         
-    logger.addHandler(adhand)
-
-
     c = {}
     c.update(csrf(request))
     username = password = ''
@@ -187,9 +162,6 @@ def login_auth(request):
                 return HttpResponse("wrong")
     form = LoginForm()
 
-    adhand.flush()
-    adhand.close()
-    logger.handlers = []
     t = loader.get_template('login.html')
     c = RequestContext(request, {'form':form, 'username':username})
     return HttpResponse(t.render(c))
@@ -203,26 +175,6 @@ def tempview(request):
 @csrf_protect
 def admin(request):
 
-    #create logger                                                                                    
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                       
-                                                                                                    
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                           
-                                                                                                     
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                   
-    
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                       
-    logger.addHandler(adhand)                         
-
     if request.user.is_authenticated():
         if request.method == 'POST':
             form = RemovalForm(request.POST)
@@ -231,8 +183,6 @@ def admin(request):
                 logger.info("admin has removed " + form.cleaned_data['Studyno'])
                 removeByNumber(form.cleaned_data['Studyno'])
                 dropStudyData(form.cleaned_data['Studyno'])
-
-                
 
     
         #get list of queued studies
@@ -250,18 +200,12 @@ def admin(request):
 
         form = RemovalForm()
 
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         data = zip(queuedlist, datelist)
         t = loader.get_template('admin.html')
         c = RequestContext(request, {'form':form,'loglines':loglines,'data':data,'queuedlist':queuedlist, 'datelist':datelist,})
         return HttpResponse(t.render(c))
     else:
         logger.info('anonymous user has been redirected to login page')
-        adhand.flush()
-        adhand.close()
-        logger.handlers=[]
         return HttpResponseRedirect('../login')
 
     
@@ -269,27 +213,6 @@ def admin(request):
 # home handles requests for the home page
 @csrf_protect
 def home(request):
-
-    #create logger                                                                                  
-                                                                                                     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                       
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                           
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                   
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     if request.user.is_authenticated():
         c = {}
@@ -311,47 +234,21 @@ def home(request):
         #make form to store input
         form = ContactForm()
 
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         #send http response back to user
         t = loader.get_template('home.html')
         c = RequestContext(request, {'form':form,'notice': notice})
         return HttpResponse(t.render(c))
     else:
         logger.info('anonymous user has been redirected to login')
-        adhand.flush()
-        adhand.close()
         return HttpResponseRedirect('login')
 
 
 #data handles requests for the visualization page
 #studynumber is required to be a valid GSE id of hte form GSE##### where # is a decimal digit
 def data(request, studynumber):
-
-    #create logger                                                                                   
-                                                                                                    
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
     
     if request.user.is_authenticated():
         logger.info("user has viewed to see the visualization page")
-        logger.handlers = []
-        adhand.flush()
-        adhand.close()
         try:
             columns = getNumberOfColumns(str(studynumber))
             rows = getNumberOfRows(str(studynumber))
@@ -368,34 +265,10 @@ def data(request, studynumber):
 
     else:
         logger.info('anonymous user has been redirected to login page')
-        logger.handlers = []
-        adhand.flush()
-        adhand.close()
         return HttpResponseRedirect('../../login')
 
 #list handles requests for the requested studies page
 def list(request):
-
-    #create logger                                                                                  
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     if request.user.is_authenticated():
         logger.info("user has requested to see the requested studies page")
@@ -406,9 +279,6 @@ def list(request):
         # get list of processed studies
         processedlist = getProcessedStudyList()
 
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         #send http response back to user
         t = loader.get_template('list.html')
         c = RequestContext(request, {'queuedlist':queuedlist,'processedlist':processedlist,'waitlist':waitlist,})
@@ -416,43 +286,16 @@ def list(request):
 
     else:
         logger.info('anonymous user has been redirected to login')
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         return HttpResponseRedirect('../login')
 
 #plist handles requests for the processed studies page
 def plist(request):
-
-    #create logger                                                                                   
-                                                                                                    
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     if request.user.is_authenticated():
         logger.info("user has requested to see the processed studies page")
         # get list of processed studies
         processedlist = getProcessedStudyList()
         
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         # return http response back to user
         t = loader.get_template('plist.html')
         c = RequestContext(request, {'processedlist':processedlist,})
@@ -460,43 +303,16 @@ def plist(request):
 
     else:
         logger.info("anonymous user has been redirected to login")
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         return HttpResponseRedirect('../login')
 
 #qlist handles requests for the queued studies page
 def qlist(request):
-
-    #create logger                                                                                   
-                                                                                                     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     if request.user.is_authenticated():
         logger.info("user has requested to see the queued studies page")
         #get list of queued studies
         queuedlist = getQueuedStudyList()
         
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         # return http response back to user
         t = loader.get_template('qlist.html')
         c = RequestContext(request, {'queuedlist':queuedlist,})
@@ -504,16 +320,13 @@ def qlist(request):
 
     else:
         logger.info('anonymous user has been redirected to login')
-        adhand.flush()
-        adhand.close()
-        logger.handlers = []
         return HttpResponseRedirect('../login')
 
 #about handles requests for the about page
 def about(request):
 
     if request.user.is_authenticated():
-        # return htp response back to user
+        # return http response back to user
         t = loader.get_template('about.html')
         c = RequestContext(request, {})
         return HttpResponse(t.render(c))
@@ -524,7 +337,7 @@ def about(request):
 def studyerror(request):
     
     if request.user.is_authenticated():
-        # return htp response back to user
+        # return http response back to user
         t = loader.get_template('studyerror.html')
         c = RequestContext(request, {})
         return HttpResponse(t.render(c))
@@ -540,26 +353,6 @@ def send_zipfile(request, studynumber):
     without loading the whole file into memory. A similar approach can          
     be used for large dynamic PDF files.                                        
     """
-
-    #create logger                                                                                   
-                                                                                                     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     logger.info("user has downloaded the study data for " + studynumber)
     temp = tempfile.TemporaryFile()
@@ -577,10 +370,7 @@ def send_zipfile(request, studynumber):
     response['Content-Disposition'] = name
     response['Content-Length'] = temp.tell()
     temp.seek(0)
-    
-    adhand.flush()
-    adhand.close()
-    logger.handlers = []
+
     return response
 
 #sendAllPairs handles requests to download All Pairs data
@@ -591,27 +381,6 @@ def sendAllPairs(request, studynumber):
     without loading the whole file into memory. A similar approach can
     be used for large dynamic PDF files.
     """
-
-    #create logger                                                                                   
-                                                                                                     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     logger.info("user has downloaded the allpairs data for " + studynumber)
     temp = tempfile.TemporaryFile()
@@ -630,9 +399,6 @@ def sendAllPairs(request, studynumber):
     response['Content-Length'] = temp.tell()
     temp.seek(0)
 
-    adhand.flush()
-    adhand.close()
-    logger.handlers = []
     return response
 
 #sendLog handles requests to download Log files
@@ -643,27 +409,6 @@ def sendLog(request, studynumber):
     without loading the whole file into memory. A similar approach can
     be used for large dynamic PDF files.
     """
-
-    #create logger                                                                                   
-                                                                                                     
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     logger.info("user has downloaded the log for " + studynumber)
 
@@ -681,9 +426,6 @@ def sendLog(request, studynumber):
     response['Content-Length'] = temp.tell()
     temp.seek(0)
 
-    adhand.flush()
-    adhand.close()
-    logger.handlers = []
     return response
 
 
@@ -694,27 +436,6 @@ def sendadminLog(request):
     without loading the whole file into memory. A similar approach can                         
     be used for large dynamic PDF files.                                                       
     """
-
-    #create logger                                                                                   
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-
-        #create admin handler                                                                        
-
-    adhand = logging.FileHandler('Studies/admin.log')
-    adhand.setLevel(logging.INFO)
-
-        #create formatter                                                                            
-
-    formatter = logging.Formatter('%(asctime)s - %(message)s')
-
-        #set formatter for adhand                                                                    
-
-    adhand.setFormatter(formatter)
-
-        #add adhand to logger                                                                        
-    logger.addHandler(adhand)
 
     logger.info("admin has downloaded the admin log")
 
@@ -732,9 +453,6 @@ def sendadminLog(request):
     response['Content-Length'] = temp.tell()
     temp.seek(0)
 
-    adhand.flush()
-    adhand.close()
-    logger.handlers = []
     return response
 
 

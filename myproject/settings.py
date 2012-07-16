@@ -134,6 +134,11 @@ INSTALLED_APPS = (
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {
+            'format': '%(asctime)s - %(message)s'
+            },
+        },
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
@@ -144,7 +149,13 @@ LOGGING = {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
-        }
+        },
+        'adminhand':{
+            'level':'INFO',
+            'formatter':'simple',
+            'class': 'logging.FileHandler',
+            'filename': 'Studies/admin.log',
+            },
     },
     'loggers': {
         'django.request': {
@@ -152,5 +163,9 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+        'admin': {
+            'handlers': ['adminhand'],
+            'level': 'INFO'
+            },
     }
 }

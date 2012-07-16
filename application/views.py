@@ -90,33 +90,40 @@ def upload_study(request):
             email = form.cleaned_data['Email']
             studyname = form.cleaned_data['Name'].replace(' ', '_')
             a = re.compile(r"\w+")
-            if re.match(a,studyname):
+            possibleMatch = re.match(a,studyname)
+            if possibleMatch:
+                if possibleMatch.group() == studyname:
+                    if not alreadyRequested(studyname):
             
         #create handler
-                filename = 'Studies/' + studyname +'/log.txt'
-                dir = os.path.dirname(filename)
-                
-                if not os.path.exists(dir):
-                    os.makedirs(dir)
-                    
-                hand = logging.FileHandler(filename)
-                hand.setLevel(logging.INFO)
+                        filename = 'Studies/' + studyname +'/log.txt'
+                        dir = os.path.dirname(filename)
+                        
+                        if not os.path.exists(dir):
+                            os.makedirs(dir)
+                        
+                        hand = logging.FileHandler(filename)
+                        hand.setLevel(logging.INFO)
                    
         #create formatter     
-                formatter = logging.Formatter('%(asctime)s - %(message)s')
+                        formatter = logging.Formatter('%(asctime)s - %(message)s')
             
         #set formatter for hand    
-                hand.setFormatter(formatter)
+                        hand.setFormatter(formatter)
             
         #add hand to logger
-                logger.addHandler(hand)
+                        logger.addHandler(hand)
 
-                handle_uploaded_file(request.FILES['File'], studyname)
-                logger.info("File " + studyname +".tab Successfully uploaded to temp file")
-                postRequest(studyname, email)
-                thread.start_new_thread(uploadAttrFile, (studyname, email))
-            
-                notice = "Successfully began uploading your file, you will recieve and e-mail when it is done";
+                        handle_uploaded_file(request.FILES['File'], studyname)
+                        logger.info("File " + studyname +".tab Successfully uploaded to temp file")
+                        postRequest(studyname, email)
+                        thread.start_new_thread(uploadAttrFile, (studyname, email))
+
+                        notice = "Successfully began uploading your file, you will recieve and e-mail when it is done";
+                    else:
+                        notice = "That study name has already been used, Please try another."
+                else:
+                    notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
             else:
                 notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
     else:

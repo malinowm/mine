@@ -105,6 +105,8 @@ def uploadAttrFile(studyid, email):
     attrlist = []
     ready = 0
     lineno = 1
+    correctFormat = True
+    error = []
     for line in f:
         try:
 
@@ -122,43 +124,58 @@ def uploadAttrFile(studyid, email):
                     #insert ids into database with no to keep order
                         db[studyid+"order"].insert({"no":n,"GSM":x})
                         n+=1
-                    else:
+            else:
             #check for attribute line
                         
-                        data = line.split("\t")
+                data = line.split("\t")
                         
-                        result = re.match("attribute_", data[0])
+                result = re.match("attribute_", data[0])
                         
-                        if result:
+                if result:
                 #line is attribute line
-                            no = 0
-                            for cell in data[1:]:
+                    no = 0
+                    for cell in data[1:]:
                         #ready denotes weather or not all dicts have been initialized or not
-                                if ready == 0:
-                                    attrlist.append({})
-                                    attrlist[no][(data[0][10:])] = cell
-                                else:
-                                    attrlist[no][(data[0][10:])] = cell
-                                    no+=1
-                                    ready = 1
-            else:
+                        if ready == 0:
+                            attrlist.append({})
+                            attrlist[no][(data[0][10:])] = cell
+                            
+                        else:
+                            attrlist[no][(data[0][10:])] = cell
+                            no+=1
+                    ready = 1
+                else:
                 #line is id/float data line
-                db[studyid].insert({"id":data[0], "canonical_id":data[0].upper(), "data":data[1:]})
+                    db[studyid].insert({"id":data[0], "canonical_id":data[0].upper(), "data":data[1:]})
         except:
             logger.info("error reading line no " + str(lineno) + ". check formatting")
+            error.append(lineno)
+            correctFormat = False
         lineno += 1
     no = 1
     #for each dict add id-GSM entry and insert
+    
     logger.info("done parsing file")
-    for entry in attrlist:
+    if correctFormat == True:
+        try:
+            for entry in attrlist:
         #gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
         #entry['GSM'] = gsm_id
-        db[studyid+'GSM'].insert(entry)
+                db[studyid+'GSM'].insert(entry)
+        except:
+            logger.info("error uploading attribute Data into Database")
+            # email 7?
+        logger.info("data from " + studyid + " has been uploaded to database")
+        markRequestQueued(studyid)
+        logger.info("sending email to notify user data is done uploading")
+        sendEmail([email], studyid, 5)
+    else:
+        logger.info("The file failed to upload correctly, please check formatting and try again.")
+        removeByNumber(studyid)
+        db[studyid].drop()
+        db[studyid+"order"].drop()
+        sendEmail([email], studyid, 6, error)
 
-    logger.info("data from " + studyid + " has been uploaded to database")
-    markRequestQueued(studyid)
-    logger.info("sending email to notify user data is done uploading")
-    sendEmail([email], studyid, 5)
     logger.removeHandler(logger.handlers[1])
     Connection.disconnect(connection)
     #close and delete the file
@@ -340,7 +357,7 @@ def isValidNumber(studyid):
 # type is a variable that denotes which message to send and is an optional arguement, if omitted type will automatically be equal to 0
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
 # addresses is required to be a list of valid email addresses
-def sendEmail(addresses, studyid, type = 0):
+def sendEmail(addresses, studyid, type = 0, data=[]):
 
     # Type 0 message means the study has been successfully marked as processed and is ready for viewing.
     if type == 0:
@@ -365,6 +382,14 @@ def sendEmail(addresses, studyid, type = 0):
     elif type == 5:
         SUBJECT = 'Mine has finished uploading and processing your file'
         MESSAGE = 'Your study ' + studyid + 'has been successfully uploaded to our servers. You may now go view your data at http://yates.webfactional.com/studies/view/' + studyid
+    elif type == 6:
+        SUBJECT = 'Mine encountered an error uploading your study data'
+        MESSAGE = 'Your study data contained a syntax error.The following lines had errors on them.\n\n\n['
+        for item in data:
+            MESSAGE += " " + str(item)
+        MESSAGE += " ]"
+            
+        
     SENDER = 'noreply@yates.webfactional.com'
     
 

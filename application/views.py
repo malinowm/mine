@@ -4,7 +4,6 @@ from django.template import RequestContext, loader
 from django.core.context_processors import csrf
 from django.views.decorators.csrf import csrf_protect
 from django import forms
-#from geo_api.script import *
 from mineWebservice import *
 from datetime import datetime
 import thread
@@ -15,12 +14,29 @@ from pymongo import Connection
 import re
 from django.contrib.auth import authenticate, login
 import logging
+from math import sqrt, ceil
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 logger = logging.getLogger('admin')
 
 HOST = '127.0.0.1'
 PORT = 27017
 connection = Connection(HOST, PORT)
+
+class Counter:
+    count = 0
+
+    def increment(self):
+        self.count += 1
+        return ""
+    def decrement(self):
+        self.count -= 1
+        return ""
+    def reset(self):
+        self.count = 0
+        return ""
+    def next(self):
+        return (self.count + 1)
 
 #data object to hold input data from user
 class ContactForm(forms.Form):
@@ -39,45 +55,111 @@ class UploadForm(forms.Form):
     Email = forms.EmailField(max_length=256)
     File = forms.FileField()
 
+class FileForm(forms.Form):
+    File = forms.FileField()
+    Study = forms.CharField(max_length=16)
+
+
 @csrf_protect
-def get_samples(request):
-    c = {}
-    notice = ""
-    c.update(csrf(request))
-    if request.method == 'POST':
-        form = ContactForm(request.POST)
-        if form.is_valid():
+def home(request):
 
-            study = form.cleaned_data['Study']
-            email = form.cleaned_data['Email']
+    if request.user.is_authenticated():
+        c = {}
+        c.update(csrf(request))
+        notice = ""
 
-            if alreadyRequested(study):
-                temp = tempfile.NamedTemporaryFile()
-                logger.info("user has downloaded the attribute data for study " + study)
-                archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
-                writeAttrFile(temp, study)
-                archive.write(temp.name)
-                archive.close()
-                filename = temp.name # Select your files here.
-                wrapper = FileWrapper(temp)
-                response = HttpResponse(wrapper, content_type='application/zip')
-                name = 'attachment; filename=' + study + '-attrData.zip'
-                response['Content-Disposition'] = name
-                response['Content-Length'] = temp.tell()
-                temp.seek(0)
-            
+        if request.method == 'POST': # If the form has been submitted...
+            downloadForm = ContactForm(request.POST) # A form bound to the POST data
+            uploadForm = UploadForm(request.POST, request.FILES)
+            if downloadForm.is_valid(): # All validation rules pass
 
-                return response
+                # Check for study existance, download files, upload files and notify user of progress via email
+                try:
+                    logger.info("user has requested that study " + downloadForm.cleaned_data['Study'] + " be processed")
+                    thread.start_new_thread(downloadAndUpload, (downloadForm.cleaned_data['Study'].upper(), downloadForm.cleaned_data['Email']))
+                    dt = str(datetime.now())
+                    notice = dt[:len(dt)-7] + ": Thanks for using M.I.N.E. We will notify you via email at " + downloadForm.cleaned_data['Email'] + " as updates occur on study " + downloadForm.cleaned_data['Study'] + "."
+                except:
+                    notice = "an error has occur"
+            elif uploadForm.is_valid():
+
+
+                email = uploadForm.cleaned_data['Email']
+                studyname = uploadForm.cleaned_data['Name'].replace(' ', '_')
+                a = re.compile(r"\w+")
+                possibleMatch = re.match(a,studyname)
+                if possibleMatch:
+                    if possibleMatch.group() == studyname:
+                        if not alreadyRequested(studyname):
+
+                        #create handler
+                            filename = 'Studies/' + studyname +'/log.txt'
+                            dir = os.path.dirname(filename)
+
+                            if not os.path.exists(dir):
+                                os.makedirs(dir)
+
+                            hand = logging.FileHandler(filename)
+                            hand.setLevel(logging.INFO)
+
+                        #create formatter
+                            formatter = logging.Formatter('%(asctime)s - %(message)s')
+
+                        #set formatter for hand
+                            hand.setFormatter(formatter)
+
+                        #add hand to logger
+                            logger.addHandler(hand)
+
+                            handle_uploaded_file(request.FILES['File'], studyname)
+                            logger.info("File " + studyname +".tab Successfully uploaded to temp file")
+                            postRequest(studyname, email)
+                            thread.start_new_thread(uploadAttrFile, (studyname, email))
+
+                            notice = "Successfully began uploading your file, you will recieve and e-mail when it is done";
+                        else:
+                            notice = "That study name has already been used, Please try another."
+                    else:
+                        notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
+                else:
+                    notice = "your file name is not formatted correctly. Please use alphanumeric characters spaces or underscores."
             else:
-                logger.info("user has requested to download attribute data for study " + study + " but it does not exist in our database")
-                notice = "The Study that you have requested to download attribute data for does not exist in our database"
-        else:
-            notice = "The information that You have entered is incorrect"
-    form = ContactForm()
+                notice = "Please Submit a valid form"
 
-    t = loader.get_template('samples.html')
-    c = RequestContext(request, {'form':form, 'notice':notice})
-    return HttpResponse(t.render(c))
+        #make form to store input
+        downloadForm = ContactForm()
+        uploadForm = UploadForm()
+        #send http response back to user
+        t = loader.get_template('home.html')
+        c = RequestContext(request, {'downloadForm':downloadForm,'uploadForm':uploadForm,'notice': notice})
+        return HttpResponse(t.render(c))
+    else:
+        logger.info('anonymous user has been redirected to login')
+        return HttpResponseRedirect('login')
+
+
+
+
+def get_samples(request, studyid):
+
+    if alreadyRequested(studyid):
+        temp = tempfile.NamedTemporaryFile()
+        logger.info("user has downloaded the attribute data for study " + studyid)
+        archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
+        writeAttrFile(temp, studyid)
+        archive.write(temp.name)
+        archive.close()
+        filename = temp.name # Select your files here.
+        wrapper = FileWrapper(temp)
+        response = HttpResponse(wrapper, content_type='application/zip')
+        name = 'attachment; filename=' + studyid + '-attrData.zip'
+        response['Content-Disposition'] = name
+        response['Content-Length'] = temp.tell()
+        temp.seek(0)
+            
+    else:
+        logger.info("user has requested to download attribute data for study " + study + " but it does not exist in our database")
+    return response
 
 #upload handles user request to upload new study files
 @csrf_protect
@@ -95,7 +177,7 @@ def upload_study(request):
                 if possibleMatch.group() == studyname:
                     if not alreadyRequested(studyname):
             
-        #create handler
+                        #create handler
                         filename = 'Studies/' + studyname +'/log.txt'
                         dir = os.path.dirname(filename)
                         
@@ -105,13 +187,13 @@ def upload_study(request):
                         hand = logging.FileHandler(filename)
                         hand.setLevel(logging.INFO)
                    
-        #create formatter     
+                        #create formatter     
                         formatter = logging.Formatter('%(asctime)s - %(message)s')
             
-        #set formatter for hand    
+                        #set formatter for hand    
                         hand.setFormatter(formatter)
             
-        #add hand to logger
+                        #add hand to logger
                         logger.addHandler(hand)
 
                         handle_uploaded_file(request.FILES['File'], studyname)
@@ -215,39 +297,6 @@ def admin(request):
         logger.info('anonymous user has been redirected to login page')
         return HttpResponseRedirect('../login')
 
-    
-
-# home handles requests for the home page
-@csrf_protect
-def home(request):
-
-    if request.user.is_authenticated():
-        c = {}
-        c.update(csrf(request))
-        notice = ""
-    
-        if request.method == 'POST': # If the form has been submitted...
-            form = ContactForm(request.POST) # A form bound to the POST data
-            if form.is_valid(): # All validation rules pass
-            
-                # Check for study existance, download files, upload files and notify user of progress via email
-                try:
-                    logger.info("user has requested that study " + form.cleaned_data['Study'] + " be processed")
-                    thread.start_new_thread(downloadAndUpload, (form.cleaned_data['Study'].upper(), form.cleaned_data['Email']))
-                    dt = str(datetime.now())
-                    notice = dt[:len(dt)-7] + ": Thanks for using M.I.N.E. We will notify you via email at " + form.cleaned_data['Email'] + " as updates occur on study " + form.cleaned_data['Study'] + "."
-                except:
-                    notice = "an error has occur"
-        #make form to store input
-        form = ContactForm()
-
-        #send http response back to user
-        t = loader.get_template('home.html')
-        c = RequestContext(request, {'form':form,'notice': notice})
-        return HttpResponse(t.render(c))
-    else:
-        logger.info('anonymous user has been redirected to login')
-        return HttpResponseRedirect('login')
 
 
 #data handles requests for the visualization page
@@ -315,19 +364,40 @@ def plist(request):
 #qlist handles requests for the queued studies page
 def qlist(request):
 
-    if request.user.is_authenticated():
-        logger.info("user has requested to see the queued studies page")
+    logger.info("user has requested to see the queued studies page")
         #get list of queued studies
-        queuedlist = getQueuedStudyList()
-        
-        # return http response back to user
-        t = loader.get_template('qlist.html')
-        c = RequestContext(request, {'queuedlist':queuedlist,})
-        return HttpResponse(t.render(c))
+    requestedlist = getStudyList()
+    attributes = []
+    queued = []
+    for study in requestedlist:
+        if hasAttributeData(study):
+            attributes.append(True)
+        else:
+            attributes.append(False)
+        if requestQueued(study):
+            queued.append(True)
+        else:
+            queued.append(False)
 
-    else:
-        logger.info('anonymous user has been redirected to login')
-        return HttpResponseRedirect('../login')
+    data = zip(requestedlist,attributes, queued)  
+    
+    paginator = Paginator(data, 50)
+    
+    page = request.GET.get('page')
+    try:
+        studylist = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        studylist = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        studylist = paginator.page(paginator.num_pages)
+
+        # return http response back to user
+    t = loader.get_template('qlist.html')
+    c = RequestContext(request, {'studylist':studylist,})
+    return HttpResponse(t.render(c))
+
 
 #about handles requests for the about page
 def about(request):
@@ -341,16 +411,12 @@ def about(request):
     else:
         return HttpResponseRedirect('../login')
 
-def studyerror(request):
-    
-    if request.user.is_authenticated():
+def format(request):
         # return http response back to user
-        t = loader.get_template('studyerror.html')
-        c = RequestContext(request, {})
-        return HttpResponse(t.render(c))
-    
-    else:
-        return HttpResponseRedirect('../login')
+    t = loader.get_template('format.html')
+    c = RequestContext(request, {})
+    return HttpResponse(t.render(c))
+
     
 #send_zipfile handles requests to download Study Data
 #studynumber is required to be a string containing a valid GSE id of the form GSE##### where # is a decimal digit
@@ -486,7 +552,7 @@ def formatData(request):
         return HttpResponse(simplejson.dumps(data),mimetype="application/json")
 
 def sendStudy(request, studyid):
-    packStudyData(studyid)
+    #packStudyData(studyid)
     return HttpResponse("This is not yet implemented")
 
 def complete(request):
@@ -505,15 +571,16 @@ def geneExistance(request):
 
 def getChartData(request):
     studyid = request.GET.get('studyid');
-    gene_x = request.GET.get('gene_x');
-    gene_y = request.GET.get('gene_y');
 
     try:
-        ret = retrieveChartData(studyid, gene_x, gene_y)
+        ret = retrieveChartData(studyid)
         #ret = [{gene_x:gene_y, studyid:"this"}]
+        return HttpResponse(ret ,mimetype="application/json")
     except:
-        ret = [{"this":"is_wrong"}]
-    return HttpResponse(simplejson.dumps(ret),mimetype="application/json")
+        this = "this"
+        is_wrong = "is_wrong"
+        ret = {}
+        return HttpResponse(simplejson.dumps(ret) ,mimetype="application/json")
     
 def getAttrData(request):
     studyid = request.GET.get('studyid');
@@ -523,3 +590,181 @@ def getAttrData(request):
     except:
         ret = [{"this":"is_incorrect"}]
     return HttpResponse(simplejson.dumps(ret),mimetype="application/json")
+
+def getSingleAttrData(request):
+    studyid = request.GET.get('studyid');
+    attr = request.GET.get('attr');
+
+    try:
+        ret = retrieveSingleAttr(studyid, attr)
+    except:
+        ret = [{"this":"is_incorrect"}]
+
+    return HttpResponse(simplejson.dumps(ret),mimetype="application/json")
+
+def singlePlot(request, studynumber):
+    
+    notice = ""
+    gene_x = ""
+    gene_y = ""
+    try:
+        gene_x = request.GET.get('gene_x');
+        gene_y = request.GET.get('gene_y');
+    except:
+        notice = "Two genes must be requested to make a graph"
+
+    t = loader.get_template('plot.html')
+    c = RequestContext(request, {'notice':notice,'gene_x':gene_x,'gene_y':gene_y,'studyid': studynumber})
+    return HttpResponse(t.render(c))
+
+@csrf_protect
+def plotList(request, studynumber):
+
+    if request.method == 'POST':
+        fileForm = FileForm(request.POST, request.FILES)
+        if fileForm.is_valid():
+            xList = []
+            yList = []
+            for chunk in request.FILES['File'].chunks():
+                lines = chunk.split('\n')
+                for line in lines:
+                    genes = line.split(', ')
+                    xList.append(genes[0])
+                    yList.append(genes[1])
+            pairs = zip(xList, yList)
+            c = Counter()
+
+            plotNumber = len(genePairs)
+            tablelen = [1]*plotNumber
+            
+            columns = getNumberOfColumns(str(studynumber))
+            rows = getNumberOfRows(str(studynumber))
+            date = getDateRequested(str(studynumber))
+            
+            t = loader.get_template('thumbs.html')
+            c = RequestContext(request, {'notice':notice,'pairs':pairs,'studyid': studynumber, 'plotNumber':plotNumber,'label':label,'tablelen':tablelen,'counter':c,'columns':columns,'rows':rows,'date':date,})
+            return HttpResponse(t.render(c))
+    else:
+        notice = ""
+        genes = ""
+        label = ""
+
+        try:
+            genes = request.GET.get('genes')
+            label = request.GET.get('label')
+        except:
+            notice = "The information entered was insufficient."
+            
+        genePairs = genes.split(':')
+        plotNumber = len(genePairs)
+        num = plotNumber/5
+        tablelen = [1]*plotNumber
+        xList = []
+        yList = []
+
+        columns = getNumberOfColumns(str(studynumber))
+        rows = getNumberOfRows(str(studynumber))
+        date = getDateRequested(str(studynumber))
+        
+        for pair in genePairs:
+            ids = pair.split(',')
+            xList.append(ids[0])
+            yList.append(ids[1])
+
+        pairs = zip(xList, yList)
+        c = Counter()
+        t = loader.get_template('thumbs.html')
+        c = RequestContext(request, {'notice':notice,'pairs':pairs,'studyid': studynumber, 'plotNumber':plotNumber,'label':label,'tablelen':tablelen,'counter':c,'columns':columns,'rows':rows,'date':date,})
+        return HttpResponse(t.render(c))
+
+@csrf_protect
+def thumbnails(request):
+
+    if request.method == 'POST':
+        fileForm = FileForm(request.POST, request.FILES)
+        if fileForm.is_valid():
+            xList = []
+            yList = []
+            for chunk in request.FILES['File'].chunks():
+                lines = chunk.split('\n')
+                for line in lines:
+                    genes = line.split(', ')
+                    xList.append(genes[0])
+                    yList.append(genes[1].rstrip())
+            pairs = zip(xList, yList)
+            c = Counter()
+
+            plotNumber = len(xList)
+            tablelen = [1]*plotNumber
+
+            studynumber = fileForm.cleaned_data['Study']
+            columns = getNumberOfColumns(str(studynumber))
+            rows = getNumberOfRows(str(studynumber))
+            date = getDateRequested(str(studynumber))
+            label = "geo_accession"
+
+            t = loader.get_template('thumbs.html')
+            con = RequestContext(request, {'pairs':pairs,'studyid': studynumber, 'plotNumber':plotNumber,'label':label,'tablelen':tablelen,'counter':c,'columns':columns,'rows':rows,'date':date,})
+            return HttpResponse(t.render(con))
+    else:
+
+        studies = getQueuedStudyList()
+        fileForm = FileForm()
+
+        t = loader.get_template('thumbnails.html')
+        c = RequestContext(request, {'studies':studies,"fileform":fileForm,})
+        return HttpResponse(t.render(c))
+
+def getAttributeKeys(request):
+    studyid = request.GET.get('studyid');
+
+    try:
+        ret = retrieveAttrKeys(studyid)
+    except:
+        ret = ['none',]
+    return HttpResponse(simplejson.dumps(ret),mimetype="application/json")
+
+@csrf_protect
+def downloadGraph(request):
+
+#    graph = request.GET.get("graph");
+
+    temp = tempfile.NamedTemporaryFile()
+    # logger.info("user has downloaded the attribute data for study " + study)
+    archive = zipfile.ZipFile(temp, 'w', zipfile.ZIP_DEFLATED)
+    
+    archive.write(temp.name)
+    archive.close()
+    filename = temp.name # Select your files here.
+    #temp.write(graph);
+    wrapper = FileWrapper(temp)
+    response = HttpResponse(wrapper, content_type='application/zip')
+    name = 'attachment; filename=graph.zip'
+    response['Content-Disposition'] = name
+    response['Content-Length'] = temp.tell()
+    temp.seek(0)
+    
+    
+    return response
+
+
+def getGraph(request):
+    fileContent = request.POST['svg']
+    res = HttpResponse(fileContent)
+    res['Content-Disposition'] = 'attachment; filename=graph.xml'
+    return res
+
+
+def uploadTest(request):
+    t = loader.get_template('uploadtest.html')
+    c = RequestContext(request, {})
+    return HttpResponse(t.render(c))
+
+def dashboard(request, studynumber):
+
+    genes = getTwoGeneIds(studynumber, 0)
+    minigenes = getTwoGeneIds(studynumber, 2)
+
+    t = loader.get_template('dashboard.html')
+    c = RequestContext(request, {'studyid':studynumber,'genex':genes[0],'geney':genes[1],'genex2':minigenes[0],'geney2':minigenes[1],})
+    return HttpResponse(t.render(c))

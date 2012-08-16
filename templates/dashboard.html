@@ -1,0 +1,77 @@
+{% extends 'minibase.html' %}
+{% load staticfiles %}
+{% block content %}
+<style>
+
+#header1{
+   font: bold normal large/2.4em Verdana, sans-serif;;
+}
+
+</style>
+
+
+<body onLoad="dashLoad('{{studyid}}', '{{genex}}','{{geney}}','{{genex2}}','{{geney2}}')" height="100%">
+
+<center>
+<h1 id="header1"> Study {{studyid}} </h1>
+<div style="background-color:#66ff99; height: 2em;width: 2em;-moz-border-radius: 1em 1em 1em 1em;border-radius: 1em 1em 1em 1em; border: 3px solid #005500;">
+				<p style="color:#005500 margin-top:-1em; margin-left:3em;">Status</p>
+				
+			</div>
+
+<div style="padding:20px;">
+<table width=100%>
+	<tr>
+		<td width=40% style=" padding: 10px;">
+			<div style="background-color: #eeeeee; height:400px; width:100%;  cursor: pointer; " onclick="alert('redirect')" onmouseover="mouseOn(this)" onmouseout="mouseOffBox(this)">
+			<h2> Visualization </h2>
+			<div style="width:100%; height:80%;" id="plot"></div>
+			</div>
+		</td>
+		<td width=20% style=" padding: 10px;">
+			<table width=100%>
+				<tr>
+					<td width=100% >
+						<div style="background-color: #eeeeee; height:175px; width:100%; cursor: pointer;" onclick="alert('redirect')" onmouseover="mouseOn(this)" onmouseout="mouseOffBox(this)">
+						<h2> Thumbnails </h2>
+						<table width=100% height=75%>
+							<tr>
+								<td width=50% height=100%>
+									<div id="plot1" style="height:100%; width=100%;"></div>
+								</td>
+								<td width=50% height=75%>
+									<div id="plot2" style="height:100%; width=100%;"></div>
+								</td>
+							</tr>
+						</table>
+						</div>
+					</td>
+				</tr>
+				<tr>
+					<td width=100% >
+						<div style="background-color: #eeeeee; height:225px; width:100%; cursor: pointer;" onclick="alert('redirect')" onmouseover="mouseOn(this)" onmouseout="mouseOffBox(this)"></div>
+					</td>
+				</tr>
+			</table>
+		</td>
+		<td width=40% style=" padding: 10px;">
+			<div style="background-color: #eeeeee;  height:400px; width:100%; cursor: pointer;" onclick="alert('redirect')" onmouseover="mouseOn(this)" onmouseout="mouseOffBox(this)"></div>
+		</td>
+	</tr>
+	<tr>
+		<td>
+		</td>
+		<td>
+		</td>
+		<td>
+		</td>
+	</tr>
+</table>
+</div>
+	</center>	
+
+	<select id="selectColorCode" style="visibility:hidden;">  </select>
+
+</body>
+
+{% endblock %}

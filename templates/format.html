@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+
+<h2>Formatting your file to upload for visualization</h2>
+
+
+<ul> <h3>First, the file needs to contain a header containing the GSMs in order</h3>
+  <li> This takes the form of a # followed by a tab then the GSMs separated by tabs</li>
+  <li> i.e. "# &nbsp;&nbsp;&nbsp;&nbsp;   GSM1 &nbsp;&nbsp;&nbsp;&nbsp;   GSM3 &nbsp;&nbsp;&nbsp;&nbsp;   GSM45 &nbsp;&nbsp;&nbsp;&nbsp;   GSM2 &nbsp;&nbsp;&nbsp;&nbsp;   GSM90"</li>
+</ul>
+<ul> <h3>The file will also need to contain the actual data you wish to visualize</h3>
+  <li> This takes the form of a gene_id followed by a tab then the values measured separated by tabs</li>
+  <li> i.e. "vash1 &nbsp;&nbsp;&nbsp;&nbsp;   0.987 &nbsp;&nbsp;&nbsp;&nbsp;   0.123 &nbsp;&nbsp;&nbsp;&nbsp;   0.3413 &nbsp;&nbsp;&nbsp;&nbsp;   0.321 &nbsp;&nbsp;&nbsp;&nbsp;   0.9832"</li>
+</ul>
+<ul> <h3>Finally, including attribute data allows a more detailed view at samples</h3>
+  <li> This takes the form of attribute_ followed by the attribute name, a tab, then the values separated by tabs</li>
+  <li> i.e. "attribute_gender &nbsp;&nbsp;&nbsp;&nbsp;   male &nbsp;&nbsp;&nbsp;&nbsp;   male &nbsp;&nbsp;&nbsp;&nbsp;   male &nbsp;&nbsp;&nbsp;&nbsp;   female &nbsp;&nbsp;&nbsp;&nbsp;   male"
+</ul>
+
+
+{% endblock %}

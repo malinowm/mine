@@ -2,9 +2,56 @@
 {% load staticfiles %}
 {% block content %}
 {{notice}}
-<form id="studyinput" action="." method="post">
+
+<h2> Welcome to M.I.N.E. </h2>
+
+
+
+<center>
+<table>
+  <tr>
+    <td width=330>
+      <p> Download a study using our automated system from the geo database</p>
+     </td>
+    <td width=40>
+      </td>
+    <td width=330>
+      <p> Upload your own study to use our visualization software</p>
+      </td>
+    </tr>
+  </table>
+<table>
+  <tr>
+    <td width=330 style=" border: 1px solid #D3D3D3;">
+
+<form id="studyinput" action="." method="post" style="margin-left:52px;">
 	{% csrf_token %}
-	{{ form.as_p }}
-	<input type="submit" value="Submit" class="btn btn-success" />
+	{{ downloadForm.as_p }}
+	<center>
+	<input type="submit" value="Submit" class="btn btn-success" style="margin-left: -52px;"/>
+	</center>
 </form>
+
+</td>
+<td width = 40>
+<center>
+<p>Or</p>
+</center>
+</td>
+<td width=330 style=" border: 1px solid #D3D3D3;">
+
+<form enctype="multipart/form-data" id="studyinput" action="." method="post" style="margin-left:52px;">
+        {% csrf_token %}
+        {{ uploadForm.as_p }}
+	<center>
+        <input type="submit" value="Submit" class="btn btn-success" style="margin-left: -52px;"/>
+	</center>
+</form>
+
+</td>
+</tr>
+</table>
+</center>
+
+<p>Before uploading your own study, Please visit our documentation on how to format your file <a href="/studies/formatting">here</a><p>
 {% endblock %}

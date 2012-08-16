@@ -12,12 +12,26 @@ from geo_api.script import *
 import time
 from subprocess import Popen, PIPE, STDOUT
 from geo_api.geo import GSE
-
+from bson import BSON
+from bson import json_util
+from django.utils import simplejson
 #connection info
 HOST = '127.0.0.1'
 PORT = 27017
 
 logger = logging.getLogger('admin')
+
+def hasAttributeData(studyid):
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+    x = db[studyid+"GSM"].find_one()
+    ret = False
+    if x:
+        ret = True
+    Connection.disconnect(connection)
+
+    return ret
 
 def getAttributeData(studyid):
 
@@ -47,6 +61,7 @@ def uploadAttrData(studyid, gse):
         for name, value in sample.attr.items():
             if len(value) < 2:
                 logger.debug("length is less than 2")
+                value = getCorrectType(value)
                 document[name] = value
             else:
                 logger.debug("length is not less than 2")
@@ -56,7 +71,8 @@ def uploadAttrData(studyid, gse):
                         logging.debug("splitting")
                         items = item.split(': ')
                         logger.debug("adding to document")
-                        document[items[0]] = items[1]
+                        entry = getCorrectType(items[1])
+                        document[items[0]] = entry
                     else:
                         if first:
                             document[name] = item
@@ -66,7 +82,7 @@ def uploadAttrData(studyid, gse):
         db[collection].insert(document)
         n+=1
     #db[collection].ensure_index("geo_accession",1)
-    logger.info("disconnecting from server")
+    logger.info("attribute data set upload successfully")
     Connection.disconnect(connection)
 
 def writeAttrFile(f, studyid):
@@ -79,15 +95,25 @@ def writeAttrFile(f, studyid):
     samples = db[studyid+'order'].find().distinct('GSM')
     #write attributes to file in form attribute_(attr) # # # #  where #'s are the sample's attributes and attr is the attribute name
 
+
     for attr in attributes:
 
         if not attr == '_id' and not attr == 'GSM':
+
             f.write('attribute_'+attr)
+            
             for sample in samples:
                 sample = sample.rstrip()
                 samp = db[studyid+'GSM'].find({"geo_accession":sample}).distinct(attr)
                 if samp[0]:
-                    f.write('\t' + samp[0].encode('utf-8'))
+                    
+                    #if integer or float cast to string
+                    try:
+                        text = str(samp[0])
+                    #else encode into unicode
+                    except:
+                        text = samp[0].encode("utf8")
+                    f.write('\t' + text)
             f.write('\n')
 
     Connection.disconnect(connection)
@@ -136,10 +162,11 @@ def uploadAttrFile(studyid, email):
                     no = 0
                     for cell in data[1:]:
                         #ready denotes weather or not all dicts have been initialized or not
+                        cell = getCorrectType(cell)
                         if ready == 0:
                             attrlist.append({})
                             attrlist[no][(data[0][10:])] = cell
-                            
+                            no+=1
                         else:
                             attrlist[no][(data[0][10:])] = cell
                             no+=1
@@ -160,11 +187,11 @@ def uploadAttrFile(studyid, email):
         try:
             for entry in attrlist:
         #gsm_id = db[studyid +"order"].find({"no":no}).distinct("GSM")[0]
-        #entry['GSM'] = gsm_id
+        #entry['GSM'] = gsm_ids
                 db[studyid+'GSM'].insert(entry)
         except:
             logger.info("error uploading attribute Data into Database")
-            # email 7?
+            sendEmail([email], studyid, 7)
         logger.info("data from " + studyid + " has been uploaded to database")
         markRequestQueued(studyid)
         logger.info("sending email to notify user data is done uploading")
@@ -255,6 +282,19 @@ def markRequestProcessed(studyid):
         #send processing finished e-mail
 	sendEmail(email, studyid)
 
+
+#marks a request for studyid downloaded
+def markRequestDownloaded(studyid):
+     #connect
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+        #update request
+    db.request.update({"gse":studyid,}, {"$set": {"downloaded":True}})
+        #disconnect
+    Connection.disconnect(connection)
+    logging.info("study " + studyid + "has been successfully queued")
+
+
 # marks a request for studyid queued.
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
 def markRequestQueued(studyid):
@@ -266,6 +306,19 @@ def markRequestQueued(studyid):
         #disconnect
 	Connection.disconnect(connection)
 	logging.info("study " + studyid + "has been successfully queued")
+
+#marks a request for studyid sent for processing.
+def markRequestSent(studyid):
+     #connect
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+        #update request
+    db.request.update({"gse":studyid,}, {"$set": {"queued":True}})
+        #disconnect
+    Connection.disconnect(connection)
+    logging.info("study " + studyid + "has been successfully queued")
+
+
 
 # returns a list of distinct studyid's that have been requested as a list
 def getStudyList():
@@ -388,7 +441,12 @@ def sendEmail(addresses, studyid, type = 0, data=[]):
         for item in data:
             MESSAGE += " " + str(item)
         MESSAGE += " ]"
-            
+    elif type == 7:
+        SUBJECT = 'Mine encountered an error uploading the attribute data'
+        MESSAGE = 'Please double check that your data is properly formatted and try uploading the file again.'
+    elif type == 8:
+        SUBJECT = 'Mine encountered an error downloading the study data'
+        MESSAGE = 'More details on the error can be found in the admin log at http://yates.webfactional.com/studies/admin'
         
     SENDER = 'noreply@yates.webfactional.com'
     
@@ -486,7 +544,36 @@ def RetrieveData(studyid, id):
 	return ret
 
 def retrieveAttrData(studyid):
-    #connect                                                               \
+    #connect
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+        # get list of data
+    attributes = list(db[studyid+'GSM'].find_one().keys())
+    wantedAttrs = {}
+    for attribute in attributes:
+        x = db[studyid+'GSM'].find().distinct(attribute)
+        if len(x) > 1 and not attribute == '_id' :
+            wantedAttrs[attribute] = 2
+    wantedAttrs["_id"] = 0
+    
+    times = db[studyid].find_one()['data']
+    retlist=[]
+    n=1
+    specdict = {}
+    for x in times:
+        next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
+        specdict["geo_accession"] = next
+        ret = db[studyid+"GSM"].find(spec=specdict, fields=wantedAttrs)
+        for r in ret:
+            retlist.append({"sample":r})
+        #disconnect
+        n+=1
+
+    Connection.disconnect(connection)
+    
+    return retlist
+
+def retrieveAttrKeys(studyid):
 
     connection = Connection(HOST, PORT)
     db = connection.MINE
@@ -498,63 +585,55 @@ def retrieveAttrData(studyid):
         if len(x) > 1 and not attribute == '_id' :
             wantedAttrs.append(attribute)
 
+    Connection.disconnect(connection)
+
+    return wantedAttrs
+
+def retrieveSingleAttr(studyid, attr):
+
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
     n = 1
     ret = []
     times = db[studyid].find_one()['data']
     for x in times:
         next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
         data = {}
-        entry = {}
-        for attr in wantedAttrs:
-        #attr = "tissue"
-            data[attr] = getCorrectType(list(db[studyid+"GSM"].find({"geo_accession":next}).distinct(attr))[0])
-            
-                #change list of characteristics to dict
-                
-        data['id'] = next
+        entry = {}                                                                      
+        data[attr] = getCorrectType(list(db[studyid+"GSM"].find({"geo_accession":next}).distinct(
+attr)))
+                #change list of characteristics to dict                                          
         entry["sample"] = data
         ret.append(entry)
         n+=1
 
-        #disconnect                                                           
     Connection.disconnect(connection)
     return ret
 
 
-def retrieveChartData(studyid, gene_x, gene_y):
+def retrieveChartData(studyid):
 
-	#connect                                                                                                                         
+	#connect                                                                                    
         connection = Connection(HOST, PORT)
         db = connection.MINE
-        # get list of data                                                                                                               
-	x = list( db[studyid].find({"canonical_id":gene_x.upper()}) )[0]['data']
-	y = list( db[studyid].find({"canonical_id":gene_y.upper()}) )[0]['data']
-
-        attributes = db[studyid+'GSM'].find_one().keys()
-
-        n = 1
-	ret = []
-	for t in x:
-		entry = {}
-		next = db[studyid +"order"].find({"no":n}).distinct("GSM")[0]
-		data = {}
-		for attr in attributes:
-                    if not isUnwantedAttr(attr):
-                        data[attr] = getCorrectType(list(db[studyid+"GSM"].find({"geo_accession":next}).distinct(attr))[0])
-                                               
-		#change list of characteristics to dict
-		
-		data['id'] = next
-		entry["y"] = getCorrectType(y[n-1])
-		entry["x"] = getCorrectType(x[n-1])
-		entry["sample"] = data
-		ret.append(entry) 
-		n+=1
-
-        #disconnect                                                                                                                      
+        # get list of data                                                   
+        attributes = list(db[studyid+'GSM'].find_one().keys())
+        wantedAttrs = {}
+        for attribute in attributes:
+            x = db[studyid+'GSM'].find().distinct(attribute)
+            if len(x) > 1 and not attribute == '_id' :
+                wantedAttrs[attribute] = 2
+        wantedAttrs["_id"] = 0
+        ret = db[studyid+"GSM"].find(fields=wantedAttrs)
+        #disconnect                                                                                 
         Connection.disconnect(connection)
-                                                                                    
-        return ret
+        
+        retlist = []
+        for r in ret:
+            retlist.append({"sample":r})
+                                                      
+        return simplejson.dumps(retlist, default=json_util.default)
 
 # uploads all the files for a studyid into database line by line.
 # studyid is required to be a string formatted GSE##### where # is a decimal digit
@@ -777,7 +856,7 @@ def getCorrespondingVars(studyid, var):
 # email is required to be a valid e-mail address
 def downloadAndUpload(studyid, email):
 	path = 'Studies/' + studyid + '/'
-	logfile = path +'logx.txt'
+	logfile = path +'log.txt'
         #create handler and add dir if doesn't exist
         dir = os.path.dirname(path)
         
@@ -812,6 +891,7 @@ def downloadAndUpload(studyid, email):
                     stderr = p.stdout.read()
                     if p.wait() != 0:
                         logger.info('stderr = ' + stderr)
+                        sendEmail([email], studyid, 8)
                     else:
                         logger.info('attempting to upload gene data to database')
                         uploadStudy(studyid)
@@ -932,6 +1012,12 @@ def tail(f, n):
     return lines[-n:]
 
 def getCorrectType(x):
+    try :
+        if type(x) != str:
+            x = x[0]
+    except:
+        p = 0
+    finally:
 	if x.isdigit():
 		ret = int(x)
 	else:
@@ -940,3 +1026,15 @@ def getCorrectType(x):
 		except ValueError:
 			ret = x
 	return ret
+
+def getTwoGeneIds(studyid, n):
+    connection = Connection(HOST, PORT)
+    db = connection.MINE
+
+
+    genex = db[studyid].find_one(skip=n)['id']
+    geney = db[studyid].find_one(skip=(n+1))['id']
+
+    Connection.disconnect(connection)
+
+    return [genex, geney]

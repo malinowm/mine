@@ -1,30 +1,13 @@
 {% extends 'minibase.html' %}
 {% load staticfiles %}
 {% block content %}
-<body onLoad="readyToPlot()" style="min-width:1325px;">
-<center>
-<table width = 700px style="margin-top:5px;">
-  <tr>
-  <td width=12%>
-  </td>
-    <td id="in1" width=33%><center><input id="gene_1" onclick="clickclear(document.getElementById('gene_1'), 'gene_1')" type="text" size="16" value="gene_1"></center></td>
-    <td id="in2" width=33%><center><input id="gene_2" onclick="clickclear(document.getElementById('gene_2'), 'gene_2')" type="text" size="16" value="gene_2"></center></td>
-	<td>
-	<p><button class="btn btn-success" id="plotify" onclick="addPairPlots(document.getElementById('gene_1').value, document.getElementById('gene_2').value, '{{studyid}}' )" style="margin-top:-11px;" >Plotify</button></p>
-	</td>
-  </tr>
-</table>
+<body onLoad="singlePlot('{{gene_x}}','{{gene_y}}','{{studyid}}')" style="min-width:1325px;">
 
-  <div id="wait"></div>
-  <center>
-  <p id="no-results"></p>
-  <input id="studyid" value="{{studyid}}">
-</center>
 
 <center>
-<div id="barkeeper" style="positon:absolute; z-index:-1; width:100% min-width:1325px; margin-top:-50px;">
+<div id="barkeeper" style="positon:absolute; z-index:-1; width:100% min-width:1325px; margin-top:20px;">
 
-<div id="leftbar" style="position:relative; float:left; top:0px; width:275px; height:475px; border: 1px solid #D3D3D3; margin-right:-3px;">
+<div id="leftbar" style="position:relative; float:left; width:275px; height:475px; border: 1px solid #D3D3D3; margin-right:-3px;">
 
 <div id="infocontainer" style="height:100%; width:100%; position:relative;">
 	<div id="infotitle" style="height:30px;"><b>Selected Ids: 0</b>
@@ -36,7 +19,7 @@
 
 </div>
 
-<div id="rightbar" style="position:relative; float:right;  width:275px; height:475px; border: 1px solid #D3D3D3; padding:6px;">
+<div id="rightbar" style="position:relative; float:right; width:275px; height:475px; border: 1px solid #D3D3D3; padding:6px;">
 <table > 
 <tr>
 <td>
@@ -100,11 +83,16 @@
 </div>
 
 </center>
-<div style="width:700px; margin-right:12px; margin-top:30px;">
-<span>
-</span>
-</div>
 
+<center>
+<div style="width:700px;">
+<span>
+<div id="plot" style="height:500px;width700px;">
+</div>
+</span>
+<button onclick="download('')">Download Graph</button>
+</div>
+</center>
 <div>
    <form
       id="graphDownload"

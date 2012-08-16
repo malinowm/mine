@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+{{notice}}
+<script language = "javascript">
+
+function makeHttpObject() {
+try {return new XMLHttpRequest();}
+catch (error) {}
+try {return new ActiveXObject("Msxml2.XMLHTTP");}
+catch (error) {}
+try {return new ActiveXObject("Microsoft.XMLHTTP");}
+catch (error) {}
+
+throw new Error("Could not create HTTP request object.");
+}
+
+function download() {
+
+httpobj = makeHttpObject();
+var url = "http://yates.webfactional.com/studies/getGraph/";
+
+{% csrf_token %}
+httpobj.open("POST", url, true);
+
+//httpobj.onreadystatechange=handler;
+{% csrf_token %}
+httpobj.send("this");
+
+
+}
+
+function getCookie(c_name)
+    {
+        if (document.cookie.length > 0)
+        {
+            c_start = document.cookie.indexOf(c_name + "=");
+            if (c_start != -1)
+            {
+                c_start = c_start + c_name.length + 1;
+                c_end = document.cookie.indexOf(";", c_start);
+                if (c_end == -1) c_end = document.cookie.length;
+                return unescape(document.cookie.substring(c_start,c_end));
+            }
+        }
+        return "";
+     }
+
+function ajaxdown() {
+
+$.ajax({
+    type: "POST",
+    url: "http://yates.webfactional.com/studies/getGraph/",
+    data: {"svg" : "ASDFAERAFEAERFWAEFWESFAW"},
+    headers: { "X-CSRFToken": getCookie("csrftoken"), "Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" },
+success: function(retData, textStatus) {
+alert(retData.url);
+x= "<iframe src='" + retData.url; + "' style='display: none;' ></iframe>"
+$("body").append(x);
+        
+}
+});
+
+
+}
+
+function doit() {
+
+form = document.forms['graphDownload'];
+
+sXML = new XMLSerializer().serializeToString(document.getElementById('svg'));
+form.elements["svg"].value = sXML;
+form.submit();
+alert(form.elements["svg"].value);
+
+}
+
+
+</script>
+<div id="plot" style="height:500px;width:700px;"></div>
+<button onclick="makePlot('vash1', 'atg5','GSE25935','')">Render</button>
+<button onclick="doit()"> Download</button>
+<form
+      id="graphDownload"
+      method="post" action="http://yates.webfactional.com/studies/getGraph/"
+>
+        {% csrf_token %}
+        <input type="text" style="visibility:hidden;width:0px;" value="" type="hidden" name="svg">
+</form?>
+{% endblock %}
+

@@ -1,0 +1,154 @@
+{% extends 'minibase.html' %}
+{% load staticfiles %}
+{% block content %}
+{% load tags %}
+
+ <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}visualization/d3.v2.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}visualization/vis.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}visualization/actions.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/jquery-ui.min.js"></script>
+<script>
+var attrData;
+var colorTypes =d3.map();
+var attributes;
+ function plotGraphs() {
+	var n =0;
+        var x,y;
+	{% for x, y in pairs %}
+        x = '{{x}}';
+        y = '{{y}}';
+	makeSimplePlot(x, y, '{{studyid}}', n);
+	n++;
+	{% endfor %}
+}
+</script>
+ 
+
+<body  style="width:100%; height:100%;" onLoad="drawPlot('{{label}}','{{studyid}}');">
+<div id="content">
+<div id="container">
+
+<div style="position:fixed; right: 0; top: 50px; width:275px; height:475px; border: 1px solid #D3D3D3; padding:6px;">
+<table> 
+<tr>
+<td>
+
+<table>
+           <tr>
+			 <td style="width:130px;">
+			   Study:
+			</td>
+			<td>
+			  {{studyid}}
+			</td>
+			</tr>
+			<tr>
+             <td style="width:130px;">
+               Plots generated:
+             </td>
+			 <td>
+			 {{plotNumber}}
+			 </td>
+           </tr>
+           <tr>
+             <td style="width:130px;">
+               Samples:
+             </td>
+			 <td>
+			 {{columns}}
+			 </td>
+           </tr>
+           <tr>
+             <td style="width:130px;">
+               Attribute: 
+
+             </td>
+			 <td>
+			 
+			 </td>
+           </tr>
+         </table>
+
+       </td>
+	   </tr>
+	   <tr>
+	   <td>
+	   <select id="selectColorCode">  </select>
+	   </td>
+	   </tr>
+	   <tr>
+       <td>
+         <div style="height:125px;width:275px; overflow:auto;white-space: nowrap;" id="list"></div>
+       </td>
+	   </tr>
+       <td>
+         <div id="hist" style="height:200px; width:275px;" ></div>
+       </td>
+     </tr>
+   </table>
+   </div>
+   {{ counter.reset }}
+    <div style="margin-right:275px; margin-top:10px;">
+   {% for x, y in pairs %}
+  
+   <table style="float:left;">
+     <tr>
+       <td>
+	 {{counter.next}}
+         <div style="height:300px; width:300px; cursor: pointer; padding: 5px;" onclick="showBig('{{x}}','{{y}}','{{studyid}}')" onmouseover="mouseOn(this)" onmouseout="mouseOff(this)" id="plot{{ counter.count }}" ></div>
+       </td>
+     </tr>
+     <tr>
+       <td>
+	
+         {{counter.increment}}
+       </td>
+     </tr>
+   </table>
+   
+   {% endfor %}
+   <div>
+   <form
+      id="graphDownload"
+      method="post" action="http://yates.webfactional.com/studies/getGraph/"
+	
+        {% csrf_token %}
+        <input type="text" style="visibility:hidden;width:0px;" value="" type= "hidden" name="svg">
+	</form>
+	</div>
+<div id="footer-spacer"></div>
+
+   <div id="popup" class="popupplot">
+    <img src='http://www.famfamfam.com/lab/icons/silk/icons/cross.png' align='right' onclick='hideBig()' class='delete' title='Close'>
+    <img src='http://www.famfamfam.com/lab/icons/silk/icons/arrow_down.png' align='right' onclick='download("big")' title='Download Graph' >
+	<table height = 95% width=100%> 
+		<tr height = 95%>
+		<td width = 80%>
+          <div id="plotbig" style="height:100%; width:100%; position:relative;"></div>
+		  </td>
+		  <td width= 20% style="border-left-width: 1px; border-left-style: solid; border-left-color: #D3D3D3;">
+    <div id="infocontainer" style="height:100%; width:100%; position:relative;">
+	<div id="infotitle" style="height:10%;">
+	</div>
+	<div id="infobody" style="height:90%; width:100%; overflow:auto;position:absolute; border-top-width: 1px; border-top-style: solid; border-top-color: #D3D3D3;">
+	</div>
+	</div>
+	
+	</td></tr>
+	</table>
+</div>
+</div>
+
+</div>
+
+<div id="hidden" class="hiddenplot" style="height:500px; width:700px;">
+    <div id="plothide" style="height:100%; width:100%; position:relative;"></div>
+</div>
+
+</div>
+</div>
+</body>
+
+{% endblock %}
+

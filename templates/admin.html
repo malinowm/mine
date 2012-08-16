@@ -1,34 +1,6 @@
 {% extends 'base.html' %}
 {% load staticfiles %}
 {% block content %}
-<h1>Send Studies for Processing </h1>
-
-<ul id="studies" class="unstyled">
-  {% for study, date in data %}
-  <li><table>
-      <tr>
-	<td width = 15%>
-	  <a href="/studies/sendStudy/{{study}}" class="btn btn-success">Send</a>
-        </td>
-        <td><table>
-      <tr><td width=45%>
-	   Study ID {{study}}
-      </td><td width=55%>
-	  Requested {{date}}
-      </td></tr>
-      <tr><table><tr>
-	<td class="done icon" width=25%>downloaded</td>
-	<td class="done icon" width=18%>queued</td>
-	<td class="wait icon" width=12%>sent</td>
-	<td class="wait icon" width=24%>processed</td>
-	<td class="wait icon" width=18%>retrieved</td></tr></table>
-      </tr>
-      </table>
-	  </tr>
-      </table>
-  </li>
-  {% endfor %}
-</ul>
 <h2> Remove Studies </h2>
 
 <form id="studyinput" action="." method="post">
@@ -40,8 +12,10 @@
 
 <h3>displaying the last 100 lines of the log</h3>
 
+<p>
 {% for line in loglines %}
-<p>{{line}}</p>
+{{line}} 
+<BR>
 {% endfor %}
-
+<p>
 {% endblock %}

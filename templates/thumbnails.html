@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% load staticfiles %}
+{% block content %}
+
+<center>
+<table id="selectStudyTable" cellpadding="5">
+	<tr>
+		<td>
+			Study:
+		</td>
+		<td>
+		<select id="studySelect" onchange="changeStudyId()" style="font-family: sans-serif;" >
+		  <option> Select a Study </option>
+		  {% for study in studies %}
+		  <option value = {{study}}> {{study}} </option>
+		  {% endfor %}
+		</select>
+		</td>
+	</tr>
+<tr>
+	<td>
+		Attribute: 
+	</td>
+	<td>
+		<select id="attributeSelect" style="font-family: sans-serif;">
+		 <option>Select an Attribute</option>
+		</select>
+	</td>
+</tr>
+<BR>
+<BR>
+Find Genes to Plot:
+<BR>
+ 
+<table id="geneTable">
+  <tr>
+    <td>
+      <input id="gene_1" onclick="clickclear(document.getElementById('gene_1'), 'gene_1')" style="font-family: sans-serif;" type="text" size="16" value="gene_1">
+    </td>
+    <td>
+      <input id="gene_2" onclick="clickclear(document.getElementById('gene_2'), 'gene_2')" style="font-family: sans-serif;" type="text" size="16" value="gene_2">
+    </td>
+	<td>	
+		<button id="plusButton" style="margin-top:-11px;" class="btn btn-success" onClick="addPair()">+</button>
+	</tr>
+  </tr>
+</table>
+<button class="btn btn-success" onClick="goToThumbs()">Plot Pairs </button>
+
+<p></p>
+<p>Or enter a list of previously compiled genes from file</p>
+
+<p id="errornotice"> A field is not correctly filled in or selected <p>
+<form id="studyinput" action="." method="POST" style="margin-left:52px;" enctype="multipart/form-data" action="http://yates.webfactional.com/studies/plotList">
+        {% csrf_token %}
+        {{ fileform.as_p }}
+        <center>
+        <input type="submit" value="Submit" class="btn btn-success" style="margin-left: -52px;"/>
+        </center>
+</form>
+
+</center>
+<script type="text/javascript" language="JavaScript">
+         document.getElementById('studySelect').value = "Select a Study";
+    document.getElementById('errornotice').style.visibility = "hidden";
+      </script>
+{% endblock %}

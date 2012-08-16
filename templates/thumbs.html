@@ -3,11 +3,6 @@
 {% block content %}
 {% load tags %}
 
- <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
-    <script type="text/javascript" src="{{ STATIC_URL }}visualization/d3.v2.js"></script>
-    <script type="text/javascript" src="{{ STATIC_URL }}visualization/vis.js"></script>
-    <script type="text/javascript" src="{{ STATIC_URL }}visualization/actions.js"></script>
-    <script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.2/jquery-ui.min.js"></script>
 <script>
 var attrData;
 var colorTypes =d3.map();
@@ -29,7 +24,7 @@ var attributes;
 <div id="content">
 <div id="container">
 
-<div style="position:fixed; right: 0; top: 50px; width:275px; height:475px; border: 1px solid #D3D3D3; padding:6px;">
+<div id="fixedRightbar">
 <table> 
 <tr>
 <td>
@@ -79,24 +74,24 @@ var attributes;
 	   </tr>
 	   <tr>
        <td>
-         <div style="height:125px;width:275px; overflow:auto;white-space: nowrap;" id="list"></div>
+         <div id="list"></div>
        </td>
 	   </tr>
        <td>
-         <div id="hist" style="height:200px; width:275px;" ></div>
+         <div id="hist"></div>
        </td>
      </tr>
    </table>
    </div>
    {{ counter.reset }}
-    <div style="margin-right:275px; margin-top:10px;">
+    <div id="thumbContainer">
    {% for x, y in pairs %}
   
    <table style="float:left;">
      <tr>
        <td>
 	 {{counter.next}}
-         <div style="height:300px; width:300px; cursor: pointer; padding: 5px;" onclick="showBig('{{x}}','{{y}}','{{studyid}}')" onmouseover="mouseOn(this)" onmouseout="mouseOff(this)" id="plot{{ counter.count }}" ></div>
+         <div class="thumb" onclick="showBig('{{x}}','{{y}}','{{studyid}}')" onmouseover="mouseOn(this)" onmouseout="mouseOff(this)" id="plot{{ counter.count }}" ></div>
        </td>
      </tr>
      <tr>
@@ -114,7 +109,7 @@ var attributes;
       method="post" action="http://yates.webfactional.com/studies/getGraph/"
 	
         {% csrf_token %}
-        <input type="text" style="visibility:hidden;width:0px;" value="" type= "hidden" name="svg">
+        <input type="text" id="hidden" value="" type= "hidden" name="svg">
 	</form>
 	</div>
 <div id="footer-spacer"></div>
@@ -125,13 +120,14 @@ var attributes;
 	<table height = 95% width=100%> 
 		<tr height = 95%>
 		<td width = 80%>
-          <div id="plotbig" style="height:100%; width:100%; position:relative;"></div>
+          <div id="plotbig"></div>
 		  </td>
-		  <td width= 20% style="border-left-width: 1px; border-left-style: solid; border-left-color: #D3D3D3;">
-    <div id="infocontainer" style="height:100%; width:100%; position:relative;">
+		  <td width= 20% id="infocell">
+    <div id="infocontainer">
 	<div id="infotitle" style="height:10%;">
+	<b> Selected Ids: 0</b>
 	</div>
-	<div id="infobody" style="height:90%; width:100%; overflow:auto;position:absolute; border-top-width: 1px; border-top-style: solid; border-top-color: #D3D3D3;">
+	<div id="infobody" style="height:90%;">
 	</div>
 	</div>
 	
@@ -142,9 +138,6 @@ var attributes;
 
 </div>
 
-<div id="hidden" class="hiddenplot" style="height:500px; width:700px;">
-    <div id="plothide" style="height:100%; width:100%; position:relative;"></div>
-</div>
 
 </div>
 </div>

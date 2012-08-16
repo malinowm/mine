@@ -9,7 +9,7 @@
 			Study:
 		</td>
 		<td>
-		<select id="studySelect" onchange="changeStudyId()" style="font-family: sans-serif;" >
+		<select id="studySelect" class="sansSerif" onchange="changeStudyId()" >
 		  <option> Select a Study </option>
 		  {% for study in studies %}
 		  <option value = {{study}}> {{study}} </option>
@@ -22,7 +22,7 @@
 		Attribute: 
 	</td>
 	<td>
-		<select id="attributeSelect" style="font-family: sans-serif;">
+		<select id="attributeSelect" class="sansSerif">
 		 <option>Select an Attribute</option>
 		</select>
 	</td>
@@ -35,10 +35,10 @@ Find Genes to Plot:
 <table id="geneTable">
   <tr>
     <td>
-      <input id="gene_1" onclick="clickclear(document.getElementById('gene_1'), 'gene_1')" style="font-family: sans-serif;" type="text" size="16" value="gene_1">
+      <input id="gene_1" onclick="clickclear(document.getElementById('gene_1'), 'gene_1')" class="sansSerif" type="text" size="16" value="gene_1">
     </td>
     <td>
-      <input id="gene_2" onclick="clickclear(document.getElementById('gene_2'), 'gene_2')" style="font-family: sans-serif;" type="text" size="16" value="gene_2">
+      <input id="gene_2" onclick="clickclear(document.getElementById('gene_2'), 'gene_2')" class="sansSerif" type="text" size="16" value="gene_2">
     </td>
 	<td>	
 		<button id="plusButton" style="margin-top:-11px;" class="btn btn-success" onClick="addPair()">+</button>
